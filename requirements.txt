@@ -1,0 +1,9 @@
+# Agent Team Logo Creator - Dependencies
+# Note: MCPs are pre-configured in each agent's sandbox VM
+
+# CLI
+click>=8.1.7
+
+# Slack formatting
+requests>=2.28.0
+slackify-markdown>=0.2.0
