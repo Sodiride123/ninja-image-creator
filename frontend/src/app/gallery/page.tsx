@@ -361,10 +361,10 @@ export default function GalleryPage() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {images.map((img) => (
-                <button
+                <div
                   key={img.id}
                   onClick={() => setSelected(img)}
-                  className="group relative aspect-square rounded-[12px] overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors"
+                  className="group relative aspect-square rounded-[12px] overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors cursor-pointer"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -384,7 +384,7 @@ export default function GalleryPage() {
                       {img.prompt}
                     </p>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
 
