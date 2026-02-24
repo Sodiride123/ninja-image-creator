@@ -22,6 +22,7 @@ from pathlib import Path
 
 SETTINGS_PATHS = [
     Path("/root/.claude/settings.json"),
+    Path(__file__).resolve().parent.parent / "backend" / "settings.json",
     Path(__file__).resolve().parent.parent / "settings.json",
 ]
 
@@ -92,24 +93,28 @@ MODELS = {
     "claude-opus": "claude-opus-4-6",
     "claude-sonnet": "claude-sonnet-4-5-20250929",
     "claude-haiku": "claude-haiku-4-5-20251001",
-    "gpt-5": "openai/openai/gpt-5.2",
+    "gpt-5": "gpt-5.2",
     "gemini-pro": "google/gemini/gemini-3-pro-preview",
     "ninja-fast": "ninja-cline-fast",
     "ninja-standard": "ninja-cline-standard",
     "ninja-complex": "ninja-cline-complex",
 
-    # Image models
-    "gpt-image": "openai/openai/gpt-image-1.5",
+    # Image models (ordered: default first, then fallbacks)
+    "gpt-image": "gpt-image-1.5",
     "gemini-image": "google/gemini/gemini-3-pro-image-preview",
 
     # Video models
-    "sora": "openai/openai/sora-2",
-    "sora-pro": "openai/openai/sora-2-pro",
+    "sora": "sora-2",
+    "sora-pro": "sora-2-pro",
 
     # Embedding models
     "embed-small": "openai/openai/text-embedding-3-small",
     "embed-large": "openai/openai/text-embedding-3-large",
 }
+
+# Ordered lists for fallback logic
+IMAGE_MODELS = ["gpt-image", "gemini-image"]
+VIDEO_MODELS = ["sora", "sora-pro"]
 
 
 def resolve_model(name: str) -> str:

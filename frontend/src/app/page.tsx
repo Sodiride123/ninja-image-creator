@@ -30,7 +30,6 @@ import {
   createCharacterProfile,
   listCharacterProfiles,
   deleteCharacterProfile,
-  generateImageStream,
   createBrandKit,
   listBrandKits,
   deleteBrandKit,
@@ -59,7 +58,6 @@ import {
   type HistoryEntry,
   type CharacterProfile,
   type BrandKit,
-  type StreamEvent,
   type TextOverlay,
 } from "@/lib/api";
 
@@ -246,13 +244,6 @@ export default function Home() {
   const [overlayFont, setOverlayFont] = useState("bold");
   const [overlayPlacement, setOverlayPlacement] = useState("center");
 
-  // Sprint 7: Streaming preview
-  const [streamMode, setStreamMode] = useState(false);
-  const [streamPreview, setStreamPreview] = useState<string | null>(null);
-  const [streamProgress, setStreamProgress] = useState(0);
-  const [streamStage, setStreamStage] = useState(0);
-  const streamControllerRef = useRef<AbortController | null>(null);
-
   // Sprint 7: Brand kits
   const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
   const [selectedBrandKit, setSelectedBrandKit] = useState<string | null>(null);
@@ -374,41 +365,6 @@ export default function Home() {
         const batch = data as BatchResponse;
         setBatchResults(batch.images);
         setSelectedVariation(0);
-      } else if (streamMode) {
-        // Streaming preview mode
-        setStreamPreview(null);
-        setStreamProgress(0);
-        setStreamStage(0);
-        const req_params = {
-          prompt, style, size, enhance,
-          character_profile_id: selectedCharacter || undefined,
-          text_overlay: textOverlayOpen && overlayText ? { text: overlayText, font_hint: overlayFont, placement: overlayPlacement } as TextOverlay : undefined,
-          brand_kit_id: selectedBrandKit || undefined,
-        };
-        await new Promise<void>((resolve, reject) => {
-          const controller = generateImageStream(req_params, (event: StreamEvent) => {
-            if (event.type === "partial") {
-              setStreamStage(event.data.stage || 0);
-              setStreamProgress(event.data.progress_pct || 0);
-              if (event.data.preview_base64) {
-                setStreamPreview(`data:image/png;base64,${event.data.preview_base64}`);
-              }
-            } else if (event.type === "complete") {
-              const image = event.data as unknown as ImageRecord;
-              setResult(image);
-              setThread([
-                { type: "prompt", text: prompt },
-                { type: "image", image },
-              ]);
-              setStreamPreview(null);
-              setStreamProgress(100);
-              resolve();
-            } else if (event.type === "error") {
-              reject(new Error(event.data.error || "Streaming failed"));
-            }
-          });
-          streamControllerRef.current = controller;
-        });
       } else {
         const req_params = {
           prompt, style, size, enhance,
@@ -432,7 +388,6 @@ export default function Home() {
       }
     } finally {
       setLoading(false);
-      streamControllerRef.current = null;
     }
   };
 
@@ -2129,25 +2084,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Sprint 7: Stream Mode Toggle */}
-            {!videoMode && (
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div
-                  className={`w-10 h-6 rounded-full transition-colors relative ${
-                    streamMode ? "bg-purple-500" : "bg-[var(--border)]"
-                  }`}
-                  onClick={() => setStreamMode(!streamMode)}
-                >
-                  <div
-                    className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${
-                      streamMode ? "translate-x-5" : "translate-x-1"
-                    }`}
-                  />
-                </div>
-                <span className="text-sm text-[var(--muted)]">Streaming preview</span>
-              </label>
-            )}
-
             {/* Generate + Compare row */}
             <div className="flex gap-3">
               {videoMode ? (
@@ -2287,26 +2223,10 @@ export default function Home() {
               </div>
             ) : loading ? (
               <div className="w-full aspect-square max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)] relative overflow-hidden">
-                {streamMode && streamPreview ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={streamPreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain opacity-60" />
-                    <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center gap-3 z-10">
-                      <div className="w-16 h-16 border-4 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-white text-sm font-medium">Stage {streamStage}/3 — {streamProgress}%</p>
-                      <div className="w-48 h-2 bg-black/40 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-400 rounded-full transition-all duration-500" style={{ width: `${streamProgress}%` }} />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[var(--muted)] text-sm animate-pulse">
-                      {compareMode ? "Comparing models..." : variationCount > 1 ? `Generating ${variationCount} variations...` : streamMode ? "Starting stream..." : "Creating your image..."}
-                    </p>
-                  </>
-                )}
+                <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+                <p className="text-[var(--muted)] text-sm animate-pulse">
+                  {compareMode ? "Comparing models..." : variationCount > 1 ? `Generating ${variationCount} variations...` : "Creating your image..."}
+                </p>
               </div>
             ) : compareResult ? (
               /* ===== Model Comparison View ===== */

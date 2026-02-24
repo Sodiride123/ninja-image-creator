@@ -29,6 +29,7 @@ from utils.images import generate_image
 from utils.images import edit_image
 from utils.chat import chat
 from utils.video import submit_video, check_video_status, download_video
+from utils.litellm_client import IMAGE_MODELS, VIDEO_MODELS
 
 # ---------------------------------------------------------------------------
 # Config
@@ -307,19 +308,30 @@ VALID_VIDEO_SIZES = ["1280x720", "720x1280"]
 # Generation helpers
 # ---------------------------------------------------------------------------
 
-def _generate_single(prompt: str, size: str, model: str = "gemini-image") -> tuple[str, str]:
-    """Generate one image. Returns (image_id, filename). Uses fallback if primary fails."""
+def _generate_single(prompt: str, size: str, model: str | None = None) -> tuple[str, str]:
+    """Generate one image with automatic fallback through available models."""
     image_id = str(uuid.uuid4())
     filename = f"{image_id}.png"
     output_path = str(IMAGES_DIR / filename)
 
-    if model == "gemini-image":
+    # If a specific model is requested, try it first then fall back to others
+    models_to_try = list(IMAGE_MODELS)
+    if model and model in models_to_try:
+        models_to_try.remove(model)
+        models_to_try.insert(0, model)
+    elif model:
+        models_to_try.insert(0, model)
+
+    last_error = None
+    for m in models_to_try:
         try:
-            generate_image(prompt=prompt, model="gemini-image", size=size, output=output_path)
-        except Exception:
-            generate_image(prompt=prompt, model="gpt-image", size=size, output=output_path)
+            generate_image(prompt=prompt, model=m, size=size, output=output_path)
+            break
+        except Exception as e:
+            last_error = e
+            continue
     else:
-        generate_image(prompt=prompt, model=model, size=size, output=output_path)
+        raise RuntimeError(f"All image models failed. Last error: {last_error}")
 
     try:
         postprocess_image(output_path, size)
@@ -595,10 +607,10 @@ async def compare(req: CompareRequest):
 
     results = []
     records_to_save = []
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=len(IMAGE_MODELS)) as executor:
         futures = {
             executor.submit(_generate_single, generation_prompt, req.size, model): model
-            for model in ["gemini-image", "gpt-image"]
+            for model in IMAGE_MODELS
         }
         for future in as_completed(futures):
             model = futures[future]
@@ -702,16 +714,22 @@ async def generate_from_image(
             output=output_path,
         )
     except Exception as edit_error:
-        # Fallback: try text-only generation
-        try:
-            generate_image(
-                prompt=generation_prompt,
-                model="gemini-image",
-                size=size,
-                output=output_path,
-            )
-        except Exception:
-            raise HTTPException(500, f"Image generation failed: {edit_error}")
+        # Fallback: try text-only generation with model fallback
+        last_error = edit_error
+        for m in IMAGE_MODELS:
+            try:
+                generate_image(
+                    prompt=generation_prompt,
+                    model=m,
+                    size=size,
+                    output=output_path,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                continue
+        else:
+            raise HTTPException(500, f"Image generation failed: {last_error}")
 
     try:
         postprocess_image(output_path, size)
@@ -932,15 +950,25 @@ async def generate_video_endpoint(req: VideoGenerateRequest):
     if req.quality not in ("standard", "pro"):
         raise HTTPException(400, "Quality must be 'standard' or 'pro'")
 
-    model = "sora" if req.quality == "standard" else "sora-pro"
+    preferred = "sora" if req.quality == "standard" else "sora-pro"
+    models_to_try = [preferred] + [m for m in VIDEO_MODELS if m != preferred]
     video_id_internal = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
-    # Submit async video generation
-    try:
-        sora_video_id = submit_video(prompt=req.prompt, model=model, size=req.size, seconds=8)
-    except Exception as e:
-        raise HTTPException(500, f"Video submission failed: {e}")
+    # Submit async video generation with fallback
+    sora_video_id = None
+    used_model = None
+    last_error = None
+    for model in models_to_try:
+        try:
+            sora_video_id = submit_video(prompt=req.prompt, model=model, size=req.size, seconds=8)
+            used_model = model
+            break
+        except Exception as e:
+            last_error = e
+            continue
+    if not sora_video_id:
+        raise HTTPException(500, f"Video submission failed: {last_error}")
 
     record = {
         "id": video_id_internal,
@@ -948,7 +976,7 @@ async def generate_video_endpoint(req: VideoGenerateRequest):
         "prompt": req.prompt,
         "size": req.size,
         "quality": req.quality,
-        "model": model,
+        "model": used_model,
         "status": "queued",
         "progress": 0,
         "filename": None,
@@ -1044,16 +1072,26 @@ async def image_to_video(req: ImageToVideoRequest):
     w, h = map(int, parent_size.split("x"))
     video_size = "720x1280" if h > w else "1280x720"
 
-    model = "sora" if req.quality == "standard" else "sora-pro"
+    preferred = "sora" if req.quality == "standard" else "sora-pro"
+    models_to_try = [preferred] + [m for m in VIDEO_MODELS if m != preferred]
     video_id_internal = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
     # Submit with motion prompt — append image context to the prompt
     motion_prompt = f"{req.prompt} (animate the scene, camera motion, subtle movements)"
-    try:
-        sora_video_id = submit_video(prompt=motion_prompt, model=model, size=video_size, seconds=8)
-    except Exception as e:
-        raise HTTPException(500, f"Video submission failed: {e}")
+    sora_video_id = None
+    used_model = None
+    last_error = None
+    for model in models_to_try:
+        try:
+            sora_video_id = submit_video(prompt=motion_prompt, model=model, size=video_size, seconds=8)
+            used_model = model
+            break
+        except Exception as e:
+            last_error = e
+            continue
+    if not sora_video_id:
+        raise HTTPException(500, f"Video submission failed: {last_error}")
 
     record = {
         "id": video_id_internal,
@@ -1062,7 +1100,7 @@ async def image_to_video(req: ImageToVideoRequest):
         "parent_image_id": req.image_id,
         "size": video_size,
         "quality": req.quality,
-        "model": model,
+        "model": used_model,
         "status": "queued",
         "progress": 0,
         "filename": None,
@@ -1886,121 +1924,6 @@ def _apply_brand_kit(prompt: str, brand_kit_id: str | None) -> str:
     if notes:
         prompt += f", {notes}"
     return prompt
-
-
-# ---------------------------------------------------------------------------
-# Sprint 7: Streaming Preview (SSE)
-# ---------------------------------------------------------------------------
-
-@app.post("/api/generate-stream")
-async def generate_stream(req: GenerateRequest):
-    """SSE endpoint that sends partial preview + final image."""
-
-    if req.size not in VALID_SIZES:
-        raise HTTPException(400, f"Invalid size. Use: {VALID_SIZES}")
-
-    final_prompt, enhanced_prompt = _build_prompt(req.prompt, req.style, req.enhance)
-    final_prompt = _apply_character_profile(final_prompt, req.character_profile_id)
-    final_prompt = _apply_text_overlay(final_prompt, req.text_overlay)
-    final_prompt = _apply_brand_kit(final_prompt, req.brand_kit_id)
-
-    async def event_stream():
-        preview_path = None
-        # Stage 1: Generate image and send low-res preview
-        try:
-            preview_id = str(uuid.uuid4())
-            preview_filename = f"preview_{preview_id}.png"
-            preview_path = str(IMAGES_DIR / preview_filename)
-            generate_image(
-                prompt=final_prompt,
-                model="gemini-image",
-                size="1024x1024",
-                output=preview_path,
-            )
-            # Create low-res preview
-            img = Image.open(preview_path)
-            img_small = img.resize((256, 256), Image.LANCZOS)
-            buf = BytesIO()
-            img_small.save(buf, format="PNG")
-            preview_b64 = base64.b64encode(buf.getvalue()).decode()
-
-            yield f"event: partial\ndata: {json.dumps({'stage': 1, 'total_stages': 3, 'progress_pct': 33, 'preview_base64': preview_b64})}\n\n"
-        except Exception:
-            yield f"event: partial\ndata: {json.dumps({'stage': 1, 'total_stages': 3, 'progress_pct': 33, 'preview_base64': None})}\n\n"
-
-        # Stage 2: Medium-res preview from same image
-        try:
-            if preview_path and Path(preview_path).exists():
-                img = Image.open(preview_path)
-                img_med = img.resize((512, 512), Image.LANCZOS)
-                buf = BytesIO()
-                img_med.save(buf, format="PNG")
-                med_b64 = base64.b64encode(buf.getvalue()).decode()
-                yield f"event: partial\ndata: {json.dumps({'stage': 2, 'total_stages': 3, 'progress_pct': 66, 'preview_base64': med_b64})}\n\n"
-        except Exception:
-            yield f"event: partial\ndata: {json.dumps({'stage': 2, 'total_stages': 3, 'progress_pct': 66, 'preview_base64': None})}\n\n"
-
-        # Stage 3: Full resolution
-        try:
-            image_id = str(uuid.uuid4())
-            filename = f"{image_id}.png"
-            output_path = str(IMAGES_DIR / filename)
-
-            if req.size == "1024x1024" and preview_path and Path(preview_path).exists():
-                import shutil
-                shutil.copy(preview_path, output_path)
-            else:
-                generate_image(
-                    prompt=final_prompt,
-                    model="gemini-image",
-                    size=req.size,
-                    output=output_path,
-                )
-
-            try:
-                postprocess_image(output_path, req.size)
-            except Exception:
-                pass
-
-            save_prompt_history(req.prompt)
-
-            record = {
-                "id": image_id,
-                "prompt": req.prompt,
-                "enhanced_prompt": enhanced_prompt,
-                "style": req.style,
-                "size": req.size,
-                "filename": filename,
-                "model": "gemini-image",
-                "character_profile_id": req.character_profile_id,
-                "text_overlay": req.text_overlay,
-                "brand_kit_id": req.brand_kit_id,
-                "created_at": datetime.utcnow().isoformat(),
-            }
-            db = load_db()
-            db.append(record)
-            save_db(db)
-
-            yield f"event: complete\ndata: {json.dumps(record)}\n\n"
-        except Exception as e:
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
-
-        # Cleanup preview file
-        if preview_path and Path(preview_path).exists():
-            try:
-                Path(preview_path).unlink()
-            except Exception:
-                pass
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
 
 
 # ---------------------------------------------------------------------------
