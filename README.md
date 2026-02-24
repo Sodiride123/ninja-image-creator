@@ -118,24 +118,24 @@ Models are configured in `utils/litellm_client.py`. The app uses ordered fallbac
 
 | Alias | Gateway Model ID | Provider |
 |-------|-----------------|----------|
-| `gpt-image` | `gpt-image-1.5` | OpenAI |
+| `gpt-image` | `openai/openai/gpt-image-1.5` | OpenAI |
 | `gemini-image` | `google/gemini/gemini-3-pro-image-preview` | Google |
 
 ### Video Models (fallback order)
 
 | Alias | Gateway Model ID | Provider |
 |-------|-----------------|----------|
-| `sora` | `sora-2` | OpenAI |
-| `sora-pro` | `sora-2-pro` | OpenAI |
+| `sora` | `openai/openai/sora-2` | OpenAI |
+| `sora-pro` | `openai/openai/sora-2-pro` | OpenAI |
 
 ### Chat Models
 
 | Alias | Gateway Model ID | Provider |
 |-------|-----------------|----------|
-| `claude-sonnet` | `claude-sonnet-4-5-20250929` | Anthropic |
+| `claude-sonnet` | `claude-sonnet-4-6` | Anthropic |
 | `claude-haiku` | `claude-haiku-4-5-20251001` | Anthropic |
 | `claude-opus` | `claude-opus-4-6` | Anthropic |
-| `gpt-5` | `gpt-5.2` | OpenAI |
+| `gpt-5` | `openai/openai/gpt-5.2` | OpenAI |
 
 To add or reorder models, edit the `IMAGE_MODELS` and `VIDEO_MODELS` lists in `utils/litellm_client.py`.
 

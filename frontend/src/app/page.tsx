@@ -1560,7 +1560,7 @@ export default function Home() {
                           : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
                       }`}
                     >
-                      Standard (~90s)
+                      Standard
                     </button>
                     <button
                       onClick={() => setVideoQuality("pro")}
@@ -1570,7 +1570,7 @@ export default function Home() {
                           : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
                       }`}
                     >
-                      Pro (~120s)
+                      Pro
                     </button>
                   </div>
                 </div>
@@ -2161,11 +2161,8 @@ export default function Home() {
                 <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
                 <p className="text-[var(--foreground)] text-sm font-medium">Generating video...</p>
                 <p className="text-[var(--muted)] text-sm animate-pulse">
-                  Elapsed: {videoElapsed}s {videoQuality === "pro" ? "(~120s expected)" : "(~90s expected)"}
+                  This may take a few minutes. Please wait...
                 </p>
-                <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                  <div className="h-full bg-[var(--primary)] rounded-full transition-all" style={{ width: `${Math.min((videoElapsed / (videoQuality === "pro" ? 120 : 90)) * 100, 95)}%` }} />
-                </div>
               </div>
             ) : videoResult ? (
               <div className="w-full max-w-xl space-y-4">

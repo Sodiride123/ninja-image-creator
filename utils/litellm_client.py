@@ -39,7 +39,7 @@ def _load_settings() -> dict:
             return {
                 "api_key": env.get("ANTHROPIC_AUTH_TOKEN", ""),
                 "base_url": env.get("ANTHROPIC_BASE_URL", ""),
-                "default_model": env.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929"),
+                "default_model": env.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
                 "source": str(path),
             }
     return {}
@@ -60,7 +60,7 @@ def get_config() -> dict:
     return {
         "api_key": os.environ.get("LITELLM_API_KEY", _config_cache.get("api_key", "")),
         "base_url": os.environ.get("LITELLM_BASE_URL", _config_cache.get("base_url", "")),
-        "default_model": _config_cache.get("default_model", "claude-sonnet-4-5-20250929"),
+        "default_model": _config_cache.get("default_model", "claude-sonnet-4-6"),
         "source": _config_cache.get("source", "env"),
     }
 
@@ -91,21 +91,21 @@ def api_url(path: str) -> str:
 MODELS = {
     # Chat / Text models
     "claude-opus": "claude-opus-4-6",
-    "claude-sonnet": "claude-sonnet-4-5-20250929",
+    "claude-sonnet": "claude-sonnet-4-6",
     "claude-haiku": "claude-haiku-4-5-20251001",
-    "gpt-5": "gpt-5.2",
+    "gpt-5": "openai/openai/gpt-5.2",              # local: "gpt-5.2"
     "gemini-pro": "google/gemini/gemini-3-pro-preview",
     "ninja-fast": "ninja-cline-fast",
     "ninja-standard": "ninja-cline-standard",
     "ninja-complex": "ninja-cline-complex",
 
     # Image models (ordered: default first, then fallbacks)
-    "gpt-image": "gpt-image-1.5",
+    "gpt-image": "openai/openai/gpt-image-1.5",    # local: "gpt-image-1.5"
     "gemini-image": "google/gemini/gemini-3-pro-image-preview",
 
     # Video models
-    "sora": "sora-2",
-    "sora-pro": "sora-2-pro",
+    "sora": "openai/openai/sora-2",                 # local: "sora-2"
+    "sora-pro": "openai/openai/sora-2-pro",         # local: "sora-2-pro"
 
     # Embedding models
     "embed-small": "openai/openai/text-embedding-3-small",
@@ -122,7 +122,7 @@ def resolve_model(name: str) -> str:
     Resolve a short model alias to its full gateway model ID.
 
     Examples:
-        resolve_model("claude-sonnet")  -> "claude-sonnet-4-5-20250929"
+        resolve_model("claude-sonnet")  -> "claude-sonnet-4-6"
         resolve_model("gpt-5")         -> "openai/openai/gpt-5.2"
         resolve_model("sora")          -> "openai/openai/sora-2"
 
