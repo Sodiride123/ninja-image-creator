@@ -39,27 +39,8 @@ export interface GenerateRequest {
   prompt: string;
   style?: string;
   size?: string;
-  enhance?: boolean;
   count?: number;
-  character_profile_id?: string;
   text_overlay?: TextOverlay;
-  brand_kit_id?: string;
-}
-
-export interface CharacterProfile {
-  id: string;
-  name: string;
-  reference_images: string[];
-  identity_descriptors: string;
-  created_at: string;
-}
-
-export interface BrandKit {
-  id: string;
-  name: string;
-  colors: string[];
-  style_notes: string;
-  created_at: string;
 }
 
 export interface GalleryResponse {
@@ -74,16 +55,6 @@ export interface BatchResponse {
   group_id: string;
 }
 
-export interface CompareResult {
-  model: string;
-  image: ImageRecord | null;
-  error: string | null;
-}
-
-export interface CompareResponse {
-  results: CompareResult[];
-  comparison_id: string;
-}
 
 export async function generateImage(
   req: GenerateRequest
@@ -112,25 +83,6 @@ export async function refineImage(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Refinement failed" }));
     throw new Error(err.detail || "Image refinement failed");
-  }
-  return res.json();
-}
-
-export async function compareModels(
-  prompt: string,
-  style?: string,
-  size?: string
-): Promise<CompareResponse> {
-  const res = await fetch(`${API_URL}/api/compare`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, style, size }),
-  });
-  if (!res.ok) {
-    const err = await res
-      .json()
-      .catch(() => ({ detail: "Comparison failed" }));
-    throw new Error(err.detail || "Model comparison failed");
   }
   return res.json();
 }
@@ -451,30 +403,6 @@ export async function clearPromptHistory(): Promise<{ cleared: boolean }> {
 // Sprint 5: Style Transfer
 // ---------------------------------------------------------------------------
 
-export async function generateWithStyle(
-  prompt: string,
-  styleImage: File,
-  strength: number = 0.7,
-  size?: string,
-  style?: string
-): Promise<ImageRecord> {
-  const formData = new FormData();
-  formData.append("prompt", prompt);
-  formData.append("style_image", styleImage);
-  formData.append("strength", String(strength));
-  if (size) formData.append("size", size);
-  if (style) formData.append("style", style);
-
-  const res = await fetch(`${API_URL}/api/generate-with-style`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Style transfer failed" }));
-    throw new Error(err.detail || "Style transfer failed");
-  }
-  return res.json();
-}
 
 // ---------------------------------------------------------------------------
 // Sprint 5: Video Gallery Enhancements
@@ -519,70 +447,6 @@ export async function removeVideoFromCollection(
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 6: Outpainting
-// ---------------------------------------------------------------------------
-
-export async function outpaintImage(
-  imageId: string,
-  directions: string[],
-  amount: number
-): Promise<ImageRecord> {
-  const res = await fetch(`${API_URL}/api/images/${imageId}/outpaint`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ directions, amount }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Outpainting failed" }));
-    throw new Error(err.detail || "Outpainting failed");
-  }
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 6: Edit History
-// ---------------------------------------------------------------------------
-
-export interface HistoryEntry {
-  id: string;
-  edit_type: string;
-  timestamp: string;
-  params: Record<string, unknown>;
-}
-
-export interface ImageHistory {
-  image_id: string;
-  history: HistoryEntry[];
-  current_index: number;
-  can_undo: boolean;
-  can_redo: boolean;
-}
-
-export async function getImageHistory(imageId: string): Promise<ImageHistory> {
-  const res = await fetch(`${API_URL}/api/images/${imageId}/history`);
-  if (!res.ok) throw new Error("Failed to load history");
-  return res.json();
-}
-
-export async function undoImage(imageId: string): Promise<ImageRecord> {
-  const res = await fetch(`${API_URL}/api/images/${imageId}/undo`, { method: "POST" });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Cannot undo" }));
-    throw new Error(err.detail || "Cannot undo");
-  }
-  return res.json();
-}
-
-export async function redoImage(imageId: string): Promise<ImageRecord> {
-  const res = await fetch(`${API_URL}/api/images/${imageId}/redo`, { method: "POST" });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Cannot redo" }));
-    throw new Error(err.detail || "Cannot redo");
-  }
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 6: Watermarking
 // ---------------------------------------------------------------------------
 
@@ -612,80 +476,6 @@ export async function watermarkImage(
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// Sprint 7: Character Profiles
-// ---------------------------------------------------------------------------
-
-export async function createCharacterProfile(
-  name: string,
-  images: File[]
-): Promise<CharacterProfile> {
-  const formData = new FormData();
-  formData.append("name", name);
-  images.forEach((img) => formData.append("images", img));
-  const res = await fetch(`${API_URL}/api/character-profiles`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Profile creation failed" }));
-    throw new Error(err.detail || "Character profile creation failed");
-  }
-  return res.json();
-}
-
-export async function listCharacterProfiles(): Promise<CharacterProfile[]> {
-  const res = await fetch(`${API_URL}/api/character-profiles`);
-  if (!res.ok) throw new Error("Failed to load character profiles");
-  return res.json();
-}
-
-export async function deleteCharacterProfile(
-  profileId: string
-): Promise<{ status: string; id: string }> {
-  const res = await fetch(`${API_URL}/api/character-profiles/${profileId}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Failed to delete character profile");
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 7: Brand Kits
-// ---------------------------------------------------------------------------
-
-export async function createBrandKit(
-  name: string,
-  colors: string[],
-  styleNotes?: string
-): Promise<BrandKit> {
-  const res = await fetch(`${API_URL}/api/brand-kits`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, colors, style_notes: styleNotes || "" }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Brand kit creation failed" }));
-    throw new Error(err.detail || "Brand kit creation failed");
-  }
-  return res.json();
-}
-
-export async function listBrandKits(): Promise<BrandKit[]> {
-  const res = await fetch(`${API_URL}/api/brand-kits`);
-  if (!res.ok) throw new Error("Failed to load brand kits");
-  return res.json();
-}
-
-export async function deleteBrandKit(
-  kitId: string
-): Promise<{ status: string; id: string }> {
-  const res = await fetch(`${API_URL}/api/brand-kits/${kitId}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Failed to delete brand kit");
-  return res.json();
-}
 
 // ---------------------------------------------------------------------------
 // Sprint 8: SVG/Vector Export
@@ -700,31 +490,6 @@ export async function exportSvg(imageId: string): Promise<Blob> {
     throw new Error(err.detail || "SVG export failed");
   }
   return res.blob();
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 8: AI Product Photography
-// ---------------------------------------------------------------------------
-
-export type ProductScene = "studio" | "outdoor" | "lifestyle" | "flat-lay" | "holiday";
-
-export async function productPhoto(
-  imageId: string,
-  scene: ProductScene,
-  backgroundColor?: string
-): Promise<ImageRecord> {
-  const formData = new FormData();
-  formData.append("scene", scene);
-  if (backgroundColor) formData.append("background_color", backgroundColor);
-  const res = await fetch(`${API_URL}/api/images/${imageId}/product-photo`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Product photo failed" }));
-    throw new Error(err.detail || "Product photo generation failed");
-  }
-  return res.json();
 }
 
 // ---------------------------------------------------------------------------
@@ -752,119 +517,6 @@ export async function replaceObject(
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// Sprint 8: Depth Map
-// ---------------------------------------------------------------------------
-
-export async function generateDepthMap(
-  imageId: string
-): Promise<ImageRecord> {
-  const res = await fetch(`${API_URL}/api/images/${imageId}/depth-map`, {
-    method: "POST",
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Depth map generation failed" }));
-    throw new Error(err.detail || "Depth map generation failed");
-  }
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 9: Batch CSV Generation
-// ---------------------------------------------------------------------------
-
-export interface BatchJob {
-  batch_id: string;
-  total: number;
-  completed: number;
-  failed: number;
-  results: ImageRecord[];
-}
-
-export async function uploadBatchCsv(file: File): Promise<{ batch_id: string; total: number }> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await fetch(`${API_URL}/api/batch-csv`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Batch upload failed" }));
-    throw new Error(err.detail || "Batch CSV upload failed");
-  }
-  return res.json();
-}
-
-export async function getBatchStatus(batchId: string): Promise<BatchJob> {
-  const res = await fetch(`${API_URL}/api/batch-csv/${batchId}`);
-  if (!res.ok) throw new Error("Failed to get batch status");
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 9: Style Presets
-// ---------------------------------------------------------------------------
-
-export interface StylePreset {
-  id: string;
-  name: string;
-  prompt_prefix: string;
-  prompt_suffix: string;
-  style: string;
-  size: string;
-  enhance: boolean;
-  negative_prompt: string;
-  created_at: string;
-}
-
-export async function createStylePreset(preset: {
-  name: string;
-  prompt_prefix?: string;
-  prompt_suffix?: string;
-  style?: string;
-  size?: string;
-  enhance?: boolean;
-  negative_prompt?: string;
-}): Promise<StylePreset> {
-  const res = await fetch(`${API_URL}/api/style-presets`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(preset),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Preset creation failed" }));
-    throw new Error(err.detail || "Style preset creation failed");
-  }
-  return res.json();
-}
-
-export async function listStylePresets(): Promise<StylePreset[]> {
-  const res = await fetch(`${API_URL}/api/style-presets`);
-  if (!res.ok) throw new Error("Failed to load style presets");
-  return res.json();
-}
-
-export async function deleteStylePreset(presetId: string): Promise<{ status: string; id: string }> {
-  const res = await fetch(`${API_URL}/api/style-presets/${presetId}`, {
-    method: "DELETE",
-  });
-  if (!res.ok) throw new Error("Failed to delete style preset");
-  return res.json();
-}
-
-export async function applyStylePreset(presetId: string, prompt: string): Promise<ImageRecord> {
-  const formData = new FormData();
-  formData.append("prompt", prompt);
-  const res = await fetch(`${API_URL}/api/style-presets/${presetId}/apply`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Preset apply failed" }));
-    throw new Error(err.detail || "Failed to apply style preset");
-  }
-  return res.json();
-}
 
 // ---------------------------------------------------------------------------
 // Sprint 9: Multi-language Text Detection
@@ -888,29 +540,3 @@ export async function detectScript(text: string): Promise<ScriptDetection> {
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// Sprint 9: GIF Animation Export
-// ---------------------------------------------------------------------------
-
-export type GifEffect = "zoom" | "pan" | "rotate" | "pulse" | "fade";
-
-export async function exportGif(
-  imageId: string,
-  effect: GifEffect = "zoom",
-  duration: number = 2,
-  fps: number = 15
-): Promise<Blob> {
-  const formData = new FormData();
-  formData.append("effect", effect);
-  formData.append("duration", String(duration));
-  formData.append("fps", String(fps));
-  const res = await fetch(`${API_URL}/api/images/${imageId}/export-gif`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "GIF export failed" }));
-    throw new Error(err.detail || "GIF export failed");
-  }
-  return res.blob();
-}

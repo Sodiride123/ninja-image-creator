@@ -6,7 +6,6 @@ import {
   generateImage,
   enhancePrompt,
   refineImage,
-  compareModels,
   generateFromImage,
   inpaintImage,
   upscaleImage,
@@ -21,43 +20,14 @@ import {
   getPromptHistory,
   getPromptSuggestions,
   clearPromptHistory,
-  generateWithStyle,
-  outpaintImage,
-  getImageHistory,
-  undoImage,
-  redoImage,
   watermarkImage,
-  createCharacterProfile,
-  listCharacterProfiles,
-  deleteCharacterProfile,
-  createBrandKit,
-  listBrandKits,
-  deleteBrandKit,
   exportSvg,
-  productPhoto,
   replaceObject,
-  generateDepthMap,
-  uploadBatchCsv,
-  getBatchStatus,
-  listStylePresets,
-  createStylePreset,
-  deleteStylePreset,
-  applyStylePreset,
   detectScript,
-  exportGif,
   type ImageRecord,
-  type ProductScene,
-  type StylePreset,
-  type BatchJob,
-  type GifEffect,
-  type BatchResponse,
-  type CompareResponse,
   type VideoRecord,
   type AdjustParams,
   type PromptEntry,
-  type HistoryEntry,
-  type CharacterProfile,
-  type BrandKit,
   type TextOverlay,
 } from "@/lib/api";
 
@@ -93,41 +63,60 @@ const VIDEO_SIZES = [
   { id: "720x1280", label: "Portrait", ratio: "9:16" },
 ];
 
-const VARIATION_COUNTS = [1, 2, 4];
 const BRUSH_SIZES = [
   { id: "small", label: "S", size: 10 },
   { id: "medium", label: "M", size: 25 },
   { id: "large", label: "L", size: 50 },
 ];
 
-interface ThreadItem {
-  type: "prompt" | "image" | "refinement";
-  text?: string;
-  image?: ImageRecord;
-}
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("none");
   const [size, setSize] = useState("1024x1024");
-  const [enhance, setEnhance] = useState(false);
-  const [variationCount, setVariationCount] = useState(1);
-  const [compareMode, setCompareMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   // Results
-  const [result, setResult] = useState<ImageRecord | null>(null);
-  const [batchResults, setBatchResults] = useState<ImageRecord[]>([]);
-  const [selectedVariation, setSelectedVariation] = useState<number>(0);
-  const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
+  const [result, setResultRaw] = useState<ImageRecord | null>(null);
+
+  // Undo/redo history stack
+  const [resultHistory, setResultHistory] = useState<ImageRecord[]>([]);
+  const [resultIndex, setResultIndex] = useState(-1);
+  const canUndo = resultIndex > 0;
+  const canRedo = resultIndex < resultHistory.length - 1;
+
+  const setResult = useCallback((img: ImageRecord | null) => {
+    setResultRaw(img);
+    if (img) {
+      setResultHistory((prev) => {
+        const trimmed = prev.slice(0, resultIndex + 1);
+        return [...trimmed, img];
+      });
+      setResultIndex((prev) => prev + 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return;
+    const prevIndex = resultIndex - 1;
+    setResultIndex(prevIndex);
+    setResultRaw(resultHistory[prevIndex]);
+  }, [canUndo, resultIndex, resultHistory]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return;
+    const nextIndex = resultIndex + 1;
+    setResultIndex(nextIndex);
+    setResultRaw(resultHistory[nextIndex]);
+  }, [canRedo, resultIndex, resultHistory]);
 
   // Refinement
   const [refinementInput, setRefinementInput] = useState("");
   const [refining, setRefining] = useState(false);
-  const [thread, setThread] = useState<ThreadItem[]>([]);
 
   // Reference image upload
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -166,6 +155,8 @@ export default function Home() {
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoResult, setVideoResult] = useState<VideoRecord | null>(null);
   const [videoElapsed, setVideoElapsed] = useState(0);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Image-to-video (animate)
   const [animateOpen, setAnimateOpen] = useState(false);
@@ -174,6 +165,8 @@ export default function Home() {
   const [animating, setAnimating] = useState(false);
   const [animateResult, setAnimateResult] = useState<VideoRecord | null>(null);
   const [animateElapsed, setAnimateElapsed] = useState(0);
+  const [animateProgress, setAnimateProgress] = useState(0);
+  const animatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Image adjustments
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -196,23 +189,7 @@ export default function Home() {
   const [promptDropdownIndex, setPromptDropdownIndex] = useState(-1);
   const promptDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Style transfer
-  const [styleRefFile, setStyleRefFile] = useState<File | null>(null);
-  const [styleRefPreview, setStyleRefPreview] = useState<string | null>(null);
-  const [styleStrength, setStyleStrength] = useState(0.7);
-  const styleRefInputRef = useRef<HTMLInputElement>(null);
 
-  // Outpainting
-  const [outpaintOpen, setOutpaintOpen] = useState(false);
-  const [outpaintDirs, setOutpaintDirs] = useState<string[]>([]);
-  const [outpaintAmount, setOutpaintAmount] = useState(50);
-  const [extending, setExtending] = useState(false);
-
-  // Edit history / undo-redo
-  const [editHistory, setEditHistory] = useState<HistoryEntry[]>([]);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Watermark
   const [watermarkOpen, setWatermarkOpen] = useState(false);
@@ -223,20 +200,9 @@ export default function Home() {
   const [watermarkColor, setWatermarkColor] = useState("#ffffff");
   const [watermarking, setWatermarking] = useState(false);
 
-  // Composition guides
-  const [guideType, setGuideType] = useState<string | null>(null);
 
   // Theme
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-
-  // Sprint 7: Character profiles
-  const [characterProfiles, setCharacterProfiles] = useState<CharacterProfile[]>([]);
-  const [selectedCharacter, setSelectedCharacter] = useState<string | null>(null);
-  const [charName, setCharName] = useState("");
-  const [charFiles, setCharFiles] = useState<File[]>([]);
-  const [charCreating, setCharCreating] = useState(false);
-  const [charPanelOpen, setCharPanelOpen] = useState(false);
-  const charFileRef = useRef<HTMLInputElement>(null);
 
   // Sprint 7: Text overlay
   const [textOverlayOpen, setTextOverlayOpen] = useState(false);
@@ -244,63 +210,23 @@ export default function Home() {
   const [overlayFont, setOverlayFont] = useState("bold");
   const [overlayPlacement, setOverlayPlacement] = useState("center");
 
-  // Sprint 7: Brand kits
-  const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
-  const [selectedBrandKit, setSelectedBrandKit] = useState<string | null>(null);
-  const [brandPanelOpen, setBrandPanelOpen] = useState(false);
-  const [newKitName, setNewKitName] = useState("");
-  const [newKitColors, setNewKitColors] = useState<string[]>(["#3B82F6"]);
-  const [newKitNotes, setNewKitNotes] = useState("");
-  const [kitCreating, setKitCreating] = useState(false);
-
-  // Sprint 8: SVG export, product photo, object replacement, depth map
+  // Sprint 8: SVG export, object replacement
   const [svgExporting, setSvgExporting] = useState(false);
-  const [productPhotoOpen, setProductPhotoOpen] = useState(false);
-  const [productScene, setProductScene] = useState<ProductScene>("studio");
-  const [productBgColor, setProductBgColor] = useState("");
-  const [productLoading, setProductLoading] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState("");
   const [replaceWith, setReplaceWith] = useState("");
   const [replacePreserveStyle, setReplacePreserveStyle] = useState(true);
   const [replaceLoading, setReplaceLoading] = useState(false);
-  const [depthMapLoading, setDepthMapLoading] = useState(false);
-  const [depthMapResult, setDepthMapResult] = useState<ImageRecord | null>(null);
-  const [depthMapView, setDepthMapView] = useState(false);
-
-  // Sprint 9: Batch CSV generation
-  const [batchCsvOpen, setBatchCsvOpen] = useState(false);
-  const [batchCsvFile, setBatchCsvFile] = useState<File | null>(null);
-  const [batchCsvUploading, setBatchCsvUploading] = useState(false);
-  const [batchJob, setBatchJob] = useState<BatchJob | null>(null);
-  const batchCsvRef = useRef<HTMLInputElement>(null);
-
-  // Sprint 9: Style presets
-  const [stylePresets, setStylePresets] = useState<StylePreset[]>([]);
-  const [stylePresetsOpen, setStylePresetsOpen] = useState(false);
-  const [newPresetName, setNewPresetName] = useState("");
-  const [newPresetPrefix, setNewPresetPrefix] = useState("");
-  const [newPresetSuffix, setNewPresetSuffix] = useState("");
-  const [presetCreating, setPresetCreating] = useState(false);
-  const [presetApplying, setPresetApplying] = useState<string | null>(null);
 
   // Sprint 9: Multi-language text
   const [detectedScript, setDetectedScript] = useState<string | null>(null);
   const [detectedDirection, setDetectedDirection] = useState<string>("ltr");
 
-  // Sprint 9: GIF animation export
-  const [gifOpen, setGifOpen] = useState(false);
-  const [gifEffect, setGifEffect] = useState<GifEffect>("zoom");
-  const [gifDuration, setGifDuration] = useState(2);
-  const [gifFps, setGifFps] = useState(15);
-  const [gifExporting, setGifExporting] = useState(false);
 
   const clearResults = () => {
-    setResult(null);
-    setBatchResults([]);
-    setSelectedVariation(0);
-    setCompareResult(null);
-    setThread([]);
+    setResultRaw(null);
+    setResultHistory([]);
+    setResultIndex(-1);
     setRefinementInput("");
     setInpaintMode(false);
     setInpaintPrompt("");
@@ -312,22 +238,11 @@ export default function Home() {
     setAnimateElapsed(0);
     setAdjustOpen(false);
     setAdjustParams({ brightness: 1.0, contrast: 1.0, saturation: 1.0, sharpness: 1.0, blur: 0 });
-    setOutpaintOpen(false);
-    setOutpaintDirs([]);
     setWatermarkOpen(false);
     setWatermarkText("");
-    setHistoryOpen(false);
-    setGuideType(null);
-    setProductPhotoOpen(false);
     setReplaceOpen(false);
     setReplaceTarget("");
     setReplaceWith("");
-    setDepthMapResult(null);
-    setDepthMapView(false);
-    setBatchCsvOpen(false);
-    setBatchCsvFile(null);
-    setBatchJob(null);
-    setGifOpen(false);
   };
 
   const handleGenerate = async () => {
@@ -337,47 +252,16 @@ export default function Home() {
     clearResults();
 
     try {
-      if (styleRefFile) {
-        const image = await generateWithStyle(prompt, styleRefFile, styleStrength, size, style);
-        setResult(image);
-        setThread([
-          { type: "prompt", text: prompt },
-          { type: "image", image },
-        ]);
-      } else if (referenceFile) {
+      if (referenceFile) {
         const image = await generateFromImage(prompt, referenceFile, style, size);
         setResult(image);
-        setThread([
-          { type: "prompt", text: prompt },
-          { type: "image", image },
-        ]);
-      } else if (compareMode) {
-        const comparison = await compareModels(prompt, style, size);
-        setCompareResult(comparison);
-      } else if (variationCount > 1) {
-        const req_params = {
-          prompt, style, size, enhance, count: variationCount,
-          character_profile_id: selectedCharacter || undefined,
-          text_overlay: textOverlayOpen && overlayText ? { text: overlayText, font_hint: overlayFont, placement: overlayPlacement } as TextOverlay : undefined,
-          brand_kit_id: selectedBrandKit || undefined,
-        };
-        const data = await generateImage(req_params);
-        const batch = data as BatchResponse;
-        setBatchResults(batch.images);
-        setSelectedVariation(0);
       } else {
         const req_params = {
-          prompt, style, size, enhance,
-          character_profile_id: selectedCharacter || undefined,
+          prompt, style, size,
           text_overlay: textOverlayOpen && overlayText ? { text: overlayText, font_hint: overlayFont, placement: overlayPlacement } as TextOverlay : undefined,
-          brand_kit_id: selectedBrandKit || undefined,
         };
         const image = (await generateImage(req_params)) as ImageRecord;
         setResult(image);
-        setThread([
-          { type: "prompt", text: image.enhanced_prompt || prompt },
-          { type: "image", image },
-        ]);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Generation failed";
@@ -404,61 +288,6 @@ export default function Home() {
     }
   };
 
-  // Sprint 7: Character profile handlers
-  const handleCreateCharacter = async () => {
-    if (!charName.trim() || charFiles.length === 0) return;
-    setCharCreating(true);
-    try {
-      const profile = await createCharacterProfile(charName, charFiles);
-      setCharacterProfiles((prev) => [...prev, profile]);
-      setCharName("");
-      setCharFiles([]);
-      setSelectedCharacter(profile.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create character profile");
-    } finally {
-      setCharCreating(false);
-    }
-  };
-
-  const handleDeleteCharacter = async (id: string) => {
-    try {
-      await deleteCharacterProfile(id);
-      setCharacterProfiles((prev) => prev.filter((p) => p.id !== id));
-      if (selectedCharacter === id) setSelectedCharacter(null);
-    } catch {
-      // silently fail
-    }
-  };
-
-  // Sprint 7: Brand kit handlers
-  const handleCreateBrandKit = async () => {
-    if (!newKitName.trim() || newKitColors.length === 0) return;
-    setKitCreating(true);
-    try {
-      const kit = await createBrandKit(newKitName, newKitColors, newKitNotes);
-      setBrandKits((prev) => [...prev, kit]);
-      setNewKitName("");
-      setNewKitColors(["#3B82F6"]);
-      setNewKitNotes("");
-      setSelectedBrandKit(kit.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create brand kit");
-    } finally {
-      setKitCreating(false);
-    }
-  };
-
-  const handleDeleteBrandKit = async (id: string) => {
-    try {
-      await deleteBrandKit(id);
-      setBrandKits((prev) => prev.filter((k) => k.id !== id));
-      if (selectedBrandKit === id) setSelectedBrandKit(null);
-    } catch {
-      // silently fail
-    }
-  };
-
   // Sprint 8 handlers
   const handleExportSvg = async () => {
     if (!result) return;
@@ -478,22 +307,6 @@ export default function Home() {
     }
   };
 
-  const handleProductPhoto = async () => {
-    if (!result) return;
-    setProductLoading(true);
-    setError("");
-    try {
-      const photo = await productPhoto(result.id, productScene, productBgColor || undefined);
-      setResult(photo);
-      setThread((prev) => [...prev, { type: "image", image: photo }]);
-      setProductPhotoOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Product photo failed");
-    } finally {
-      setProductLoading(false);
-    }
-  };
-
   const handleReplaceObject = async () => {
     if (!result || !replaceTarget.trim() || !replaceWith.trim()) return;
     setReplaceLoading(true);
@@ -501,7 +314,6 @@ export default function Home() {
     try {
       const replaced = await replaceObject(result.id, replaceTarget, replaceWith, replacePreserveStyle);
       setResult(replaced);
-      setThread((prev) => [...prev, { type: "image", image: replaced }]);
       setReplaceOpen(false);
       setReplaceTarget("");
       setReplaceWith("");
@@ -512,118 +324,6 @@ export default function Home() {
     }
   };
 
-  const handleDepthMap = async () => {
-    if (!result) return;
-    setDepthMapLoading(true);
-    setError("");
-    try {
-      const dm = await generateDepthMap(result.id);
-      setDepthMapResult(dm);
-      setDepthMapView(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Depth map generation failed");
-    } finally {
-      setDepthMapLoading(false);
-    }
-  };
-
-  // Sprint 9 handlers
-  const handleBatchCsvUpload = async () => {
-    if (!batchCsvFile) return;
-    setBatchCsvUploading(true);
-    setError("");
-    setBatchJob(null);
-    try {
-      const { batch_id, total } = await uploadBatchCsv(batchCsvFile);
-      setBatchJob({ batch_id, total, completed: 0, failed: 0, results: [] });
-      // Poll for progress
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await getBatchStatus(batch_id);
-          setBatchJob(status);
-          if (status.completed + status.failed >= status.total) {
-            clearInterval(pollInterval);
-            setBatchCsvUploading(false);
-          }
-        } catch {
-          // keep polling
-        }
-      }, 2000);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Batch CSV upload failed");
-      setBatchCsvUploading(false);
-    }
-  };
-
-  const handleCreateStylePreset = async () => {
-    if (!newPresetName.trim()) return;
-    setPresetCreating(true);
-    try {
-      const preset = await createStylePreset({
-        name: newPresetName,
-        prompt_prefix: newPresetPrefix,
-        prompt_suffix: newPresetSuffix,
-        style,
-        size,
-        enhance,
-      });
-      setStylePresets((prev) => [...prev, preset]);
-      setNewPresetName("");
-      setNewPresetPrefix("");
-      setNewPresetSuffix("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create preset");
-    } finally {
-      setPresetCreating(false);
-    }
-  };
-
-  const handleDeleteStylePreset = async (id: string) => {
-    try {
-      await deleteStylePreset(id);
-      setStylePresets((prev) => prev.filter((p) => p.id !== id));
-    } catch {
-      // silently fail
-    }
-  };
-
-  const handleApplyPreset = async (preset: StylePreset) => {
-    if (!prompt.trim()) return;
-    setPresetApplying(preset.id);
-    setError("");
-    try {
-      const image = await applyStylePreset(preset.id, prompt);
-      setResult(image);
-      setThread([
-        { type: "prompt", text: `[${preset.name}] ${prompt}` },
-        { type: "image", image },
-      ]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to apply preset");
-    } finally {
-      setPresetApplying(null);
-    }
-  };
-
-  const handleExportGif = async () => {
-    if (!result) return;
-    setGifExporting(true);
-    try {
-      const blob = await exportGif(result.id, gifEffect, gifDuration, gifFps);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${result.id}-${gifEffect}.gif`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("GIF downloaded!");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "GIF export failed");
-    } finally {
-      setGifExporting(false);
-    }
-  };
-
   const handleRefine = async () => {
     if (!refinementInput.trim() || !result) return;
     setRefining(true);
@@ -631,12 +331,9 @@ export default function Home() {
     const instruction = refinementInput;
     setRefinementInput("");
 
-    setThread((prev) => [...prev, { type: "refinement", text: instruction }]);
-
     try {
       const refined = await refineImage(result.id, instruction);
       setResult(refined);
-      setThread((prev) => [...prev, { type: "image", image: refined }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Refinement failed");
     } finally {
@@ -660,6 +357,7 @@ export default function Home() {
     setError("");
     setVideoResult(null);
     setVideoElapsed(0);
+    setVideoProgress(0);
 
     try {
       const video = await generateVideo(prompt, videoSize, videoQuality);
@@ -669,12 +367,15 @@ export default function Home() {
         setVideoElapsed(Math.floor((Date.now() - startTime) / 1000));
         try {
           const status = await getVideoStatus(video.id);
+          setVideoProgress(status.progress || 0);
           if (status.status === "completed") {
             clearInterval(pollInterval);
+            videoPollRef.current = null;
             setVideoResult(status);
             setVideoLoading(false);
           } else if (status.status === "failed") {
             clearInterval(pollInterval);
+            videoPollRef.current = null;
             setError(status.error || "Video generation failed");
             setVideoLoading(false);
           }
@@ -682,6 +383,7 @@ export default function Home() {
           // Keep polling on transient errors
         }
       }, 5000);
+      videoPollRef.current = pollInterval;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Video generation failed");
       setVideoLoading(false);
@@ -695,6 +397,7 @@ export default function Home() {
     setError("");
     setAnimateResult(null);
     setAnimateElapsed(0);
+    setAnimateProgress(0);
 
     try {
       const video = await imageToVideo(result.id, animatePrompt, animateQuality);
@@ -703,12 +406,15 @@ export default function Home() {
         setAnimateElapsed(Math.floor((Date.now() - startTime) / 1000));
         try {
           const status = await getVideoStatus(video.id);
+          setAnimateProgress(status.progress || 0);
           if (status.status === "completed") {
             clearInterval(pollInterval);
+            animatePollRef.current = null;
             setAnimateResult(status);
             setAnimating(false);
           } else if (status.status === "failed") {
             clearInterval(pollInterval);
+            animatePollRef.current = null;
             setError(status.error || "Animation failed");
             setAnimating(false);
           }
@@ -716,6 +422,7 @@ export default function Home() {
           // Keep polling
         }
       }, 5000);
+      animatePollRef.current = pollInterval;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Animation failed");
       setAnimating(false);
@@ -732,11 +439,6 @@ export default function Home() {
       setResult(adjusted);
       setAdjustOpen(false);
       setAdjustParams({ brightness: 1.0, contrast: 1.0, saturation: 1.0, sharpness: 1.0, blur: 0 });
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: "Applied adjustments" },
-        { type: "image", image: adjusted },
-      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Adjustment failed");
     } finally {
@@ -752,11 +454,6 @@ export default function Home() {
     try {
       const bgRemoved = await removeBackground(result.id);
       setResult(bgRemoved);
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: "Removed background" },
-        { type: "image", image: bgRemoved },
-      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Background removal failed");
     } finally {
@@ -828,126 +525,22 @@ export default function Home() {
     } catch {}
   };
 
-  // Style reference handlers
-  const handleStyleRefSelect = (file: File) => {
-    if (!file.type.match(/^image\/(png|jpeg)$/)) {
-      setError("Style image must be PNG or JPEG");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Style image must be under 10MB");
-      return;
-    }
-    setStyleRefFile(file);
-    setStyleRefPreview(URL.createObjectURL(file));
-    setError("");
-  };
-
-  const removeStyleRef = () => {
-    setStyleRefFile(null);
-    setStyleRefPreview(null);
-    setStyleStrength(0.7);
-    if (styleRefInputRef.current) styleRefInputRef.current.value = "";
-  };
-
-  // Outpainting handler
-  const handleOutpaint = async () => {
-    if (!result || outpaintDirs.length === 0) return;
-    setExtending(true);
-    setError("");
-    try {
-      const extended = await outpaintImage(result.id, outpaintDirs, outpaintAmount);
-      setResult(extended);
-      setOutpaintOpen(false);
-      setOutpaintDirs([]);
-      setOutpaintAmount(50);
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: `Extended image: ${outpaintDirs.join(", ")} by ${outpaintAmount}%` },
-        { type: "image", image: extended },
-      ]);
-      loadEditHistory(extended.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Outpainting failed");
-    } finally {
-      setExtending(false);
-    }
-  };
-
-  const toggleOutpaintDir = (dir: string) => {
-    setOutpaintDirs((prev) =>
-      prev.includes(dir) ? prev.filter((d) => d !== dir) : [...prev, dir]
-    );
-  };
-
-  // Edit history
-  const loadEditHistory = async (imageId: string) => {
-    try {
-      const hist = await getImageHistory(imageId);
-      setEditHistory(hist.history);
-      setCanUndo(hist.can_undo);
-      setCanRedo(hist.can_redo);
-    } catch {
-      setEditHistory([]);
-      setCanUndo(false);
-      setCanRedo(false);
-    }
-  };
-
-  const handleUndo = async () => {
-    if (!result || !canUndo) return;
-    setError("");
-    try {
-      const prev = await undoImage(result.id);
-      setResult(prev);
-      setThread((t) => [...t, { type: "refinement", text: "Undo" }, { type: "image", image: prev }]);
-      loadEditHistory(prev.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Cannot undo");
-    }
-  };
-
-  const handleRedo = async () => {
-    if (!result || !canRedo) return;
-    setError("");
-    try {
-      const next = await redoImage(result.id);
-      setResult(next);
-      setThread((t) => [...t, { type: "refinement", text: "Redo" }, { type: "image", image: next }]);
-      loadEditHistory(next.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Cannot redo");
-    }
-  };
-
-  // Load history when result changes
-  useEffect(() => {
-    if (result?.id) {
-      loadEditHistory(result.id);
-    } else {
-      setEditHistory([]);
-      setCanUndo(false);
-      setCanRedo(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result?.id]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        if (result && canUndo) handleUndo();
+        handleUndo();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
         e.preventDefault();
-        if (result && canRedo) handleRedo();
+        handleRedo();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result?.id, canUndo, canRedo]);
+  }, [handleUndo, handleRedo]);
 
   // Watermark handler
   const handleWatermark = async () => {
@@ -959,12 +552,6 @@ export default function Home() {
       setResult(marked);
       setWatermarkOpen(false);
       setWatermarkText("");
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: `Added watermark: "${watermarkText}"` },
-        { type: "image", image: marked },
-      ]);
-      loadEditHistory(marked.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Watermarking failed");
     } finally {
@@ -987,13 +574,6 @@ export default function Home() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // Sprint 7: Load character profiles and brand kits on mount
-  // Sprint 9: Also load style presets
-  useEffect(() => {
-    listCharacterProfiles().then(setCharacterProfiles).catch(() => {});
-    listBrandKits().then(setBrandKits).catch(() => {});
-    listStylePresets().then(setStylePresets).catch(() => {});
-  }, []);
 
   // Sprint 9: Detect script when overlay text changes
   useEffect(() => {
@@ -1153,11 +733,6 @@ export default function Home() {
       setResult(inpainted);
       setInpaintMode(false);
       setInpaintPrompt("");
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: `Inpaint: ${inpaintPrompt}` },
-        { type: "image", image: inpainted },
-      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Inpainting failed");
     } finally {
@@ -1173,11 +748,6 @@ export default function Home() {
     try {
       const upscaled = await upscaleImage(result.id, scale);
       setResult(upscaled);
-      setThread((prev) => [
-        ...prev,
-        { type: "refinement", text: `Upscaled ${scale}x` },
-        { type: "image", image: upscaled },
-      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upscaling failed");
     } finally {
@@ -1269,19 +839,13 @@ export default function Home() {
     setShareOpen(false);
   };
 
-  // Toast auto-dismiss
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
-
   // Social template selection
   const handleTemplateSelect = (tmpl: typeof SOCIAL_TEMPLATES[0]) => {
     setSelectedTemplate(tmpl.id);
     setSize(tmpl.size);
   };
 
-  const activeResult = result || (batchResults.length > 0 ? batchResults[selectedVariation] : null);
+
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1397,63 +961,6 @@ export default function Home() {
               />
             </div>}
 
-            {/* Style Reference Upload (image mode only) */}
-            {!videoMode && <div>
-              <label className="block text-sm font-medium text-[var(--muted)] mb-2">
-                Style Reference (optional)
-              </label>
-              {styleRefPreview ? (
-                <div className="rounded-[12px] overflow-hidden border border-purple-500/50 bg-[var(--surface)]">
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={styleRefPreview}
-                      alt="Style reference"
-                      className="w-full max-h-[120px] object-contain"
-                    />
-                    <button
-                      onClick={removeStyleRef}
-                      className="absolute top-2 right-2 w-6 h-6 bg-black/60 backdrop-blur-sm rounded-full text-[var(--foreground)] text-xs flex items-center justify-center hover:bg-black/80"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="px-3 py-2 space-y-1">
-                    <p className="text-xs text-purple-400">Style reference</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[var(--muted)]">Strength</span>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={1.0}
-                        step={0.1}
-                        value={styleStrength}
-                        onChange={(e) => setStyleStrength(parseFloat(e.target.value))}
-                        className="flex-1 accent-purple-500"
-                      />
-                      <span className="text-xs text-[var(--foreground)] w-8 text-right">{styleStrength.toFixed(1)}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => styleRefInputRef.current?.click()}
-                  className="w-full border border-dashed border-purple-500/30 rounded-[12px] py-3 px-4 bg-[var(--surface)] flex items-center gap-3 hover:border-purple-500/60 transition-colors"
-                >
-                  <span className="text-lg opacity-50">🎨</span>
-                  <span className="text-sm text-[var(--muted)]">Upload a style reference image</span>
-                </button>
-              )}
-              <input
-                ref={styleRefInputRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) handleStyleRefSelect(e.target.files[0]);
-                }}
-              />
-            </div>}
 
             {/* Prompt Input with History Dropdown */}
             <div className="relative">
@@ -1655,47 +1162,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Variations */}
-            <div>
-              <label className="block text-sm font-medium text-[var(--muted)] mb-2">
-                Variations
-              </label>
-              <div className="flex gap-2">
-                {VARIATION_COUNTS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      setVariationCount(c);
-                      if (c > 1) setCompareMode(false);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm transition-all ${
-                      variationCount === c && !compareMode
-                        ? "bg-[var(--primary)] text-[var(--foreground)]"
-                        : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Enhance Toggle */}
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                className={`w-10 h-6 rounded-full transition-colors relative ${
-                  enhance ? "bg-[var(--primary)]" : "bg-[var(--border)]"
-                }`}
-                onClick={() => setEnhance(!enhance)}
-              >
-                <div
-                  className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${
-                    enhance ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </div>
-              <span className="text-sm text-[var(--muted)]">Auto-enhance prompt</span>
-            </label>
             </>}
 
             {/* Sprint 7: Text Overlay */}
@@ -1767,322 +1233,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Sprint 7: Character Profile Selector */}
-            {!videoMode && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setCharPanelOpen(!charPanelOpen)}
-                  className={`text-sm flex items-center gap-2 transition-colors ${charPanelOpen ? "text-[var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
-                >
-                  <span>👤</span> Character {charPanelOpen ? "▾" : "▸"}
-                  {selectedCharacter && <span className="text-xs bg-[var(--primary)] px-2 py-0.5 rounded-full text-[var(--foreground)]">Active</span>}
-                </button>
-                {charPanelOpen && (
-                  <div className="bg-[var(--surface)] rounded-[12px] p-3 space-y-3 border border-[var(--border)]">
-                    {characterProfiles.length > 0 && (
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => setSelectedCharacter(null)}
-                          className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                            !selectedCharacter ? "bg-[var(--primary)] text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--border)]"
-                          }`}
-                        >
-                          None
-                        </button>
-                        {characterProfiles.map((p) => (
-                          <div key={p.id} className="flex items-center gap-2">
-                            <button
-                              onClick={() => setSelectedCharacter(p.id)}
-                              className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                                selectedCharacter === p.id ? "bg-[var(--primary)] text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--border)]"
-                              }`}
-                            >
-                              {p.name}
-                            </button>
-                            <button onClick={() => handleDeleteCharacter(p.id)} className="text-red-400 hover:text-red-300 text-xs px-1">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="border-t border-[var(--border)] pt-2 space-y-2">
-                      <p className="text-xs text-[var(--muted)]">New Character</p>
-                      <input
-                        type="text"
-                        value={charName}
-                        onChange={(e) => setCharName(e.target.value)}
-                        placeholder="Character name"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <input
-                        ref={charFileRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files) setCharFiles(Array.from(e.target.files).slice(0, 3));
-                        }}
-                      />
-                      <button
-                        onClick={() => charFileRef.current?.click()}
-                        className="w-full px-3 py-1.5 text-sm bg-[var(--border)] text-[var(--muted)] rounded-[6px] hover:bg-[var(--primary)] hover:text-[var(--foreground)] transition-colors"
-                      >
-                        {charFiles.length > 0 ? `${charFiles.length} image(s) selected` : "Upload Reference (1-3)"}
-                      </button>
-                      <button
-                        onClick={handleCreateCharacter}
-                        disabled={!charName.trim() || charFiles.length === 0 || charCreating}
-                        className="w-full px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--foreground)] rounded-[6px] disabled:opacity-50 hover:bg-[var(--primary-hover)] transition-colors"
-                      >
-                        {charCreating ? "Creating..." : "Create Profile"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Sprint 7: Brand Kit Selector */}
-            {!videoMode && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setBrandPanelOpen(!brandPanelOpen)}
-                  className={`text-sm flex items-center gap-2 transition-colors ${brandPanelOpen ? "text-[var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
-                >
-                  <span>🎨</span> Brand Kit {brandPanelOpen ? "▾" : "▸"}
-                  {selectedBrandKit && <span className="text-xs bg-[var(--primary)] px-2 py-0.5 rounded-full text-[var(--foreground)]">Active</span>}
-                </button>
-                {brandPanelOpen && (
-                  <div className="bg-[var(--surface)] rounded-[12px] p-3 space-y-3 border border-[var(--border)]">
-                    {brandKits.length > 0 && (
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => setSelectedBrandKit(null)}
-                          className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                            !selectedBrandKit ? "bg-[var(--primary)] text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--border)]"
-                          }`}
-                        >
-                          None
-                        </button>
-                        {brandKits.map((k) => (
-                          <div key={k.id} className="flex items-center gap-2">
-                            <button
-                              onClick={() => setSelectedBrandKit(k.id)}
-                              className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center gap-2 ${
-                                selectedBrandKit === k.id ? "bg-[var(--primary)] text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--border)]"
-                              }`}
-                            >
-                              <span>{k.name}</span>
-                              <span className="flex gap-0.5">
-                                {k.colors.map((c, i) => (
-                                  <span key={i} className="w-3 h-3 rounded-full inline-block border border-white/20" style={{ background: c }} />
-                                ))}
-                              </span>
-                            </button>
-                            <button onClick={() => handleDeleteBrandKit(k.id)} className="text-red-400 hover:text-red-300 text-xs px-1">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="border-t border-[var(--border)] pt-2 space-y-2">
-                      <p className="text-xs text-[var(--muted)]">New Brand Kit</p>
-                      <input
-                        type="text"
-                        value={newKitName}
-                        onChange={(e) => setNewKitName(e.target.value)}
-                        placeholder="Kit name"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <div>
-                        <p className="text-xs text-[var(--muted)] mb-1">Colors (up to 6)</p>
-                        <div className="flex gap-1 flex-wrap items-center">
-                          {newKitColors.map((c, i) => (
-                            <div key={i} className="flex items-center gap-1">
-                              <input
-                                type="color"
-                                value={c}
-                                onChange={(e) => {
-                                  const updated = [...newKitColors];
-                                  updated[i] = e.target.value;
-                                  setNewKitColors(updated);
-                                }}
-                                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
-                              />
-                              {newKitColors.length > 1 && (
-                                <button
-                                  onClick={() => setNewKitColors(newKitColors.filter((_, j) => j !== i))}
-                                  className="text-red-400 text-xs"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                          {newKitColors.length < 6 && (
-                            <button
-                              onClick={() => setNewKitColors([...newKitColors, "#000000"])}
-                              className="w-7 h-7 rounded border border-dashed border-[var(--border)] text-[var(--muted)] text-xs flex items-center justify-center hover:border-[var(--primary)]"
-                            >
-                              +
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <input
-                        type="text"
-                        value={newKitNotes}
-                        onChange={(e) => setNewKitNotes(e.target.value)}
-                        placeholder="Style notes (optional)"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <button
-                        onClick={handleCreateBrandKit}
-                        disabled={!newKitName.trim() || kitCreating}
-                        className="w-full px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--foreground)] rounded-[6px] disabled:opacity-50 hover:bg-[var(--primary-hover)] transition-colors"
-                      >
-                        {kitCreating ? "Creating..." : "Create Brand Kit"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Sprint 9: Style Presets */}
-            {!videoMode && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setStylePresetsOpen(!stylePresetsOpen)}
-                  className={`text-sm flex items-center gap-2 transition-colors ${stylePresetsOpen ? "text-[var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
-                >
-                  <span>💾</span> Style Presets {stylePresetsOpen ? "▾" : "▸"}
-                  {stylePresets.length > 0 && <span className="text-xs bg-[var(--border)] px-1.5 py-0.5 rounded-full text-[var(--muted)]">{stylePresets.length}</span>}
-                </button>
-                {stylePresetsOpen && (
-                  <div className="bg-[var(--surface)] rounded-[12px] p-3 space-y-3 border border-[var(--border)]">
-                    {stylePresets.length > 0 && (
-                      <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                        {stylePresets.map((p) => (
-                          <div key={p.id} className="flex items-center gap-2 group">
-                            <button
-                              onClick={() => handleApplyPreset(p)}
-                              disabled={!prompt.trim() || presetApplying === p.id}
-                              className="flex-1 text-left px-2 py-1.5 rounded text-sm text-[var(--muted)] hover:bg-[var(--primary)]/20 hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
-                            >
-                              <span className="font-medium">{p.name}</span>
-                              {p.prompt_prefix && <span className="text-xs text-[var(--muted)] ml-1">"{p.prompt_prefix}..."</span>}
-                              {presetApplying === p.id && <span className="text-xs ml-1">generating...</span>}
-                            </button>
-                            <button onClick={() => handleDeleteStylePreset(p.id)} className="text-red-400 hover:text-red-300 text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="border-t border-[var(--border)] pt-2 space-y-2">
-                      <p className="text-xs text-[var(--muted)]">Save Current Settings</p>
-                      <input
-                        type="text"
-                        value={newPresetName}
-                        onChange={(e) => setNewPresetName(e.target.value)}
-                        placeholder="Preset name"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={newPresetPrefix}
-                        onChange={(e) => setNewPresetPrefix(e.target.value)}
-                        placeholder="Prompt prefix (optional)"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={newPresetSuffix}
-                        onChange={(e) => setNewPresetSuffix(e.target.value)}
-                        placeholder="Prompt suffix (optional)"
-                        className="w-full px-3 py-1.5 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
-                      />
-                      <button
-                        onClick={handleCreateStylePreset}
-                        disabled={!newPresetName.trim() || presetCreating}
-                        className="w-full px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--foreground)] rounded-[6px] disabled:opacity-50 hover:bg-[var(--primary-hover)] transition-colors"
-                      >
-                        {presetCreating ? "Saving..." : "Save Preset"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Sprint 9: Batch CSV */}
-            {!videoMode && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setBatchCsvOpen(!batchCsvOpen)}
-                  className={`text-sm flex items-center gap-2 transition-colors ${batchCsvOpen ? "text-[var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
-                >
-                  <span>📋</span> Batch CSV {batchCsvOpen ? "▾" : "▸"}
-                </button>
-                {batchCsvOpen && (
-                  <div className="bg-[var(--surface)] rounded-[12px] p-3 space-y-3 border border-[var(--border)]">
-                    <p className="text-xs text-[var(--muted)]">Upload a CSV with columns: prompt (required), style, size, enhance</p>
-                    <input
-                      ref={batchCsvRef}
-                      type="file"
-                      accept=".csv"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) setBatchCsvFile(e.target.files[0]);
-                      }}
-                    />
-                    <button
-                      onClick={() => batchCsvRef.current?.click()}
-                      className="w-full px-3 py-2 text-sm bg-[var(--border)] text-[var(--muted)] rounded-[6px] hover:bg-[var(--primary)] hover:text-[var(--foreground)] transition-colors"
-                    >
-                      {batchCsvFile ? batchCsvFile.name : "Choose CSV file"}
-                    </button>
-                    <button
-                      onClick={handleBatchCsvUpload}
-                      disabled={!batchCsvFile || batchCsvUploading}
-                      className="w-full px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--foreground)] rounded-[6px] disabled:opacity-50 hover:bg-[var(--primary-hover)] transition-colors"
-                    >
-                      {batchCsvUploading ? "Processing..." : "Upload & Generate"}
-                    </button>
-                    {batchJob && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--muted)]">Progress</span>
-                          <span className="text-[var(--foreground)]">{batchJob.completed}/{batchJob.total} done{batchJob.failed > 0 ? `, ${batchJob.failed} failed` : ""}</span>
-                        </div>
-                        <div className="w-full h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[var(--primary)] rounded-full transition-all"
-                            style={{ width: `${((batchJob.completed + batchJob.failed) / batchJob.total) * 100}%` }}
-                          />
-                        </div>
-                        {batchJob.results.length > 0 && (
-                          <div className="grid grid-cols-3 gap-1 max-h-[150px] overflow-y-auto">
-                            {batchJob.results.map((img) => (
-                              <button
-                                key={img.id}
-                                onClick={() => {
-                                  setResult(img);
-                                  setThread([{ type: "prompt", text: img.prompt }, { type: "image", image: img }]);
-                                }}
-                                className="rounded overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors"
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={getImageUrl(img.id)} alt={img.prompt} className="w-full h-auto" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Generate + Compare row */}
             <div className="flex gap-3">
@@ -2098,7 +1248,7 @@ export default function Home() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      Generating Video... {videoElapsed}s
+                      Generating Video... {videoProgress}% ({videoElapsed}s)
                     </span>
                   ) : (
                     "Generate Video"
@@ -2123,19 +1273,6 @@ export default function Home() {
                       "Generate Image"
                     )}
                   </button>
-                  <button
-                    onClick={() => {
-                      setCompareMode(!compareMode);
-                      if (!compareMode) setVariationCount(1);
-                    }}
-                    className={`px-4 h-12 rounded-[8px] text-sm font-medium transition-all ${
-                      compareMode
-                        ? "bg-[var(--primary)] text-[var(--foreground)]"
-                        : "border border-[var(--border)] text-[var(--primary)] hover:bg-[var(--surface)]"
-                    }`}
-                  >
-                    Compare
-                  </button>
                 </>
               )}
             </div>
@@ -2159,10 +1296,22 @@ export default function Home() {
             {videoLoading ? (
               <div className="w-full aspect-video max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)]">
                 <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
-                <p className="text-[var(--foreground)] text-sm font-medium">Generating video...</p>
-                <p className="text-[var(--muted)] text-sm animate-pulse">
-                  This may take a few minutes. Please wait...
+                <p className="text-[var(--foreground)] text-sm font-medium">Generating video... {videoProgress}%</p>
+                <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
+                  <div className="h-full bg-[var(--primary)] rounded-full transition-all duration-500" style={{ width: `${videoProgress}%` }} />
+                </div>
+                <p className="text-[var(--muted)] text-xs">
+                  Elapsed: {videoElapsed}s
                 </p>
+                {videoElapsed > 300 && (
+                  <p className="text-yellow-500 text-xs">Generation is taking longer than expected. You can cancel and retry.</p>
+                )}
+                <button
+                  onClick={() => { if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; } setVideoLoading(false); setVideoElapsed(0); setVideoProgress(0); }}
+                  className="text-xs text-[var(--muted)] hover:text-red-400 transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
             ) : videoResult ? (
               <div className="w-full max-w-xl space-y-4">
@@ -2191,8 +1340,22 @@ export default function Home() {
             ) : animating ? (
               <div className="w-full aspect-video max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)]">
                 <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-[var(--foreground)] text-sm font-medium">Animating image...</p>
-                <p className="text-[var(--muted)] text-sm animate-pulse">Elapsed: {animateElapsed}s</p>
+                <p className="text-[var(--foreground)] text-sm font-medium">Animating image... {animateProgress}%</p>
+                <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full transition-all duration-500" style={{ width: `${animateProgress}%` }} />
+                </div>
+                <p className="text-[var(--muted)] text-xs">
+                  Elapsed: {animateElapsed}s
+                </p>
+                {animateElapsed > 300 && (
+                  <p className="text-yellow-500 text-xs">Animation is taking longer than expected. You can cancel and retry.</p>
+                )}
+                <button
+                  onClick={() => { if (animatePollRef.current) { clearInterval(animatePollRef.current); animatePollRef.current = null; } setAnimating(false); setAnimateElapsed(0); setAnimateProgress(0); }}
+                  className="text-xs text-[var(--muted)] hover:text-red-400 transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
             ) : animateResult ? (
               <div className="w-full max-w-xl space-y-4">
@@ -2222,86 +1385,8 @@ export default function Home() {
               <div className="w-full aspect-square max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)] relative overflow-hidden">
                 <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
                 <p className="text-[var(--muted)] text-sm animate-pulse">
-                  {compareMode ? "Comparing models..." : variationCount > 1 ? `Generating ${variationCount} variations...` : "Creating your image..."}
+                  Creating your image...
                 </p>
-              </div>
-            ) : compareResult ? (
-              /* ===== Model Comparison View ===== */
-              <div className="w-full space-y-4">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  {compareResult.results.map((r) => (
-                    <div key={r.model} className="flex-1">
-                      {r.image ? (
-                        <div className="relative group rounded-[12px] overflow-hidden border border-[var(--border)]">
-                          <div className="absolute top-3 left-3 z-10 bg-black/60 backdrop-blur-sm text-[var(--foreground)] text-xs px-2 py-1 rounded-[6px] border-l-2" style={{ borderLeftColor: r.model === "gemini-image" ? "#14b8a6" : "#a78bfa" }}>
-                            {r.model === "gemini-image" ? "Gemini" : "GPT"}
-                          </div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={getImageUrl(r.image.id)} alt={r.image.prompt} className="w-full h-auto" />
-                          <a href={getDownloadUrl(r.image.id)} className="absolute top-3 right-3 px-3 py-2 bg-black/50 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[8px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity hover:bg-black/70">
-                            ⬇ Download
-                          </a>
-                          <button
-                            onClick={() => {
-                              setResult(r.image!);
-                              setCompareResult(null);
-                              setThread([
-                                { type: "prompt", text: prompt },
-                                { type: "image", image: r.image! },
-                              ]);
-                            }}
-                            className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[var(--primary)] text-[var(--foreground)] rounded-[8px] h-10 px-6 text-sm opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                          >
-                            Pick this one
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="rounded-[12px] bg-red-500/10 border border-red-500/30 p-6 text-center flex-1">
-                          <p className="text-red-400 text-sm mb-2">{r.model === "gemini-image" ? "Gemini" : "GPT"} unavailable</p>
-                          <p className="text-xs text-[var(--muted)]">{r.error}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : batchResults.length > 0 ? (
-              /* ===== Variations Grid ===== */
-              <div className="w-full space-y-4">
-                <div className={`grid gap-4 ${batchResults.length >= 4 ? "grid-cols-1 sm:grid-cols-2" : batchResults.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
-                  {batchResults.map((img, i) => (
-                    <div
-                      key={img.id}
-                      onClick={() => setSelectedVariation(i)}
-                      className={`relative group rounded-[12px] overflow-hidden cursor-pointer transition-all ${
-                        selectedVariation === i
-                          ? "border-2 border-[var(--primary)] shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                          : "border-2 border-transparent hover:border-[var(--border)]"
-                      }`}
-                      style={{ animationDelay: `${i * 100}ms` }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={getImageUrl(img.id)} alt={img.prompt} className="w-full h-auto" />
-                      <a href={getDownloadUrl(img.id)} className="absolute top-3 right-3 px-3 py-2 bg-black/50 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[8px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity hover:bg-black/70">
-                        ⬇ Download
-                      </a>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setResult(img);
-                          setBatchResults([]);
-                          setThread([
-                            { type: "prompt", text: prompt },
-                            { type: "image", image: img },
-                          ]);
-                        }}
-                        className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[var(--primary)] text-[var(--foreground)] rounded-[8px] h-8 px-4 text-sm opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      >
-                        Use this one
-                      </button>
-                    </div>
-                  ))}
-                </div>
               </div>
             ) : result ? (
               /* ===== Single Image + Tools ===== */
@@ -2349,41 +1434,6 @@ export default function Home() {
                       onTouchMove={draw}
                       onTouchEnd={stopDraw}
                     />
-                  )}
-
-                  {/* Composition guide overlay */}
-                  {guideType && !inpaintMode && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 300 300" preserveAspectRatio="none">
-                      {guideType === "thirds" && (
-                        <>
-                          <line x1="100" y1="0" x2="100" y2="300" stroke="cyan" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="200" y1="0" x2="200" y2="300" stroke="cyan" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="0" y1="100" x2="300" y2="100" stroke="cyan" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="0" y1="200" x2="300" y2="200" stroke="cyan" strokeWidth="0.5" opacity="0.6" />
-                        </>
-                      )}
-                      {guideType === "golden" && (
-                        <>
-                          <line x1="114" y1="0" x2="114" y2="300" stroke="gold" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="186" y1="0" x2="186" y2="300" stroke="gold" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="0" y1="114" x2="300" y2="114" stroke="gold" strokeWidth="0.5" opacity="0.6" />
-                          <line x1="0" y1="186" x2="300" y2="186" stroke="gold" strokeWidth="0.5" opacity="0.6" />
-                        </>
-                      )}
-                      {guideType === "center" && (
-                        <>
-                          <line x1="150" y1="0" x2="150" y2="300" stroke="lime" strokeWidth="0.5" opacity="0.5" />
-                          <line x1="0" y1="150" x2="300" y2="150" stroke="lime" strokeWidth="0.5" opacity="0.5" />
-                          <circle cx="150" cy="150" r="40" stroke="lime" strokeWidth="0.5" fill="none" opacity="0.4" />
-                        </>
-                      )}
-                      {guideType === "diagonal" && (
-                        <>
-                          <line x1="0" y1="0" x2="300" y2="300" stroke="orange" strokeWidth="0.5" opacity="0.5" />
-                          <line x1="300" y1="0" x2="0" y2="300" stroke="orange" strokeWidth="0.5" opacity="0.5" />
-                        </>
-                      )}
-                    </svg>
                   )}
 
                   {/* Zoom controls */}
@@ -2467,17 +1517,7 @@ export default function Home() {
                       🎨 Adjust
                     </button>
                     <button
-                      onClick={() => { setOutpaintOpen(!outpaintOpen); setWatermarkOpen(false); }}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
-                        outpaintOpen
-                          ? "border-teal-500 text-teal-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-teal-500"
-                      }`}
-                    >
-                      🔲 Extend
-                    </button>
-                    <button
-                      onClick={() => { setWatermarkOpen(!watermarkOpen); setOutpaintOpen(false); }}
+                      onClick={() => { setWatermarkOpen(!watermarkOpen); }}
                       className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
                         watermarkOpen
                           ? "border-amber-500 text-amber-400"
@@ -2485,32 +1525,6 @@ export default function Home() {
                       }`}
                     >
                       💧 Watermark
-                    </button>
-                    <button
-                      onClick={handleUndo}
-                      disabled={!canUndo}
-                      className="px-3 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="Undo (Ctrl+Z)"
-                    >
-                      ↩ Undo
-                    </button>
-                    <button
-                      onClick={handleRedo}
-                      disabled={!canRedo}
-                      className="px-3 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="Redo (Ctrl+Shift+Z)"
-                    >
-                      ↪ Redo
-                    </button>
-                    <button
-                      onClick={() => setHistoryOpen(!historyOpen)}
-                      className={`px-3 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
-                        historyOpen
-                          ? "border-[var(--primary)] text-[var(--primary)]"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]"
-                      }`}
-                    >
-                      📜 History
                     </button>
                     <button
                       onClick={() => setAnimateOpen(!animateOpen)}
@@ -2523,17 +1537,7 @@ export default function Home() {
                       🎬 Animate
                     </button>
                     <button
-                      onClick={() => { setProductPhotoOpen(!productPhotoOpen); setReplaceOpen(false); }}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
-                        productPhotoOpen
-                          ? "border-emerald-500 text-emerald-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-emerald-500"
-                      }`}
-                    >
-                      📦 Product Shot
-                    </button>
-                    <button
-                      onClick={() => { setReplaceOpen(!replaceOpen); setProductPhotoOpen(false); }}
+                      onClick={() => { setReplaceOpen(!replaceOpen); }}
                       className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
                         replaceOpen
                           ? "border-orange-500 text-orange-400"
@@ -2543,21 +1547,20 @@ export default function Home() {
                       🔄 Replace
                     </button>
                     <button
-                      onClick={handleDepthMap}
-                      disabled={depthMapLoading}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-50"
+                      onClick={handleUndo}
+                      disabled={!canUndo}
+                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Undo (⌘Z)"
                     >
-                      {depthMapLoading ? "Generating..." : "🗺️ 3D Depth"}
+                      ↩ Undo
                     </button>
                     <button
-                      onClick={() => { setGifOpen(!gifOpen); }}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
-                        gifOpen
-                          ? "border-pink-500 text-pink-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-pink-500"
-                      }`}
+                      onClick={handleRedo}
+                      disabled={!canRedo}
+                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Redo (⌘⇧Z)"
                     >
-                      🎞️ GIF
+                      ↪ Redo
                     </button>
                     <div className="relative">
                       <button
@@ -2582,46 +1585,6 @@ export default function Home() {
                           </a>
                           <button onClick={handleExportSvg} disabled={svgExporting} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors disabled:opacity-50">
                             {svgExporting ? "⏳ Exporting..." : "🔷 Download SVG"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <button
-                        onClick={() => setGuideType(guideType ? null : "thirds")}
-                        className={`px-3 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
-                          guideType
-                            ? "border-cyan-500 text-cyan-400"
-                            : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-cyan-500"
-                        }`}
-                      >
-                        📐 Guide
-                      </button>
-                      {guideType && (
-                        <div className="absolute top-full mt-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-2 shadow-xl z-20 min-w-[160px] space-y-1">
-                          {[
-                            { id: "thirds", label: "Rule of Thirds" },
-                            { id: "golden", label: "Golden Ratio" },
-                            { id: "center", label: "Center Cross" },
-                            { id: "diagonal", label: "Diagonals" },
-                          ].map((g) => (
-                            <button
-                              key={g.id}
-                              onClick={() => setGuideType(g.id)}
-                              className={`w-full text-left px-3 py-2 text-sm rounded-[6px] transition-colors ${
-                                guideType === g.id
-                                  ? "bg-cyan-500/20 text-cyan-400"
-                                  : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)]"
-                              }`}
-                            >
-                              {g.label}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setGuideType(null)}
-                            className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[var(--border)] rounded-[6px] transition-colors border-t border-[var(--border)] mt-1 pt-2"
-                          >
-                            Hide guides
                           </button>
                         </div>
                       )}
@@ -2671,56 +1634,6 @@ export default function Home() {
                         Animate
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Outpainting controls */}
-                {outpaintOpen && !inpaintMode && !adjustOpen && (
-                  <div className="space-y-3 bg-[var(--surface)] rounded-[12px] border border-teal-500/30 p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--foreground)]">Extend Image</span>
-                      <button onClick={() => { setOutpaintOpen(false); setOutpaintDirs([]); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
-                        Cancel
-                      </button>
-                    </div>
-                    <div>
-                      <span className="text-xs text-[var(--muted)] mb-2 block">Directions</span>
-                      <div className="grid grid-cols-4 gap-2">
-                        {(["up", "down", "left", "right"] as const).map((dir) => (
-                          <button
-                            key={dir}
-                            onClick={() => toggleOutpaintDir(dir)}
-                            className={`py-2 rounded-[8px] text-sm capitalize transition-all ${
-                              outpaintDirs.includes(dir)
-                                ? "bg-teal-500 text-[var(--foreground)]"
-                                : "bg-[var(--border)] text-[var(--muted)] hover:bg-teal-500/30 hover:text-[var(--foreground)]"
-                            }`}
-                          >
-                            {dir === "up" ? "↑" : dir === "down" ? "↓" : dir === "left" ? "←" : "→"} {dir}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--muted)] w-16">Amount</span>
-                      <input
-                        type="range"
-                        min={10}
-                        max={100}
-                        step={10}
-                        value={outpaintAmount}
-                        onChange={(e) => setOutpaintAmount(parseInt(e.target.value))}
-                        className="flex-1 accent-teal-500"
-                      />
-                      <span className="text-xs text-[var(--foreground)] w-10 text-right">{outpaintAmount}%</span>
-                    </div>
-                    <button
-                      onClick={handleOutpaint}
-                      disabled={outpaintDirs.length === 0 || extending}
-                      className="w-full bg-teal-500 hover:bg-teal-600 rounded-[8px] h-9 text-sm text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {extending ? "Extending..." : `Extend ${outpaintDirs.join(", ") || "..."}`}
-                    </button>
                   </div>
                 )}
 
@@ -2810,55 +1723,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Product photography panel */}
-                {productPhotoOpen && !inpaintMode && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-emerald-500/30 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--foreground)]">Product Photography</span>
-                      <button onClick={() => setProductPhotoOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">Close</button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(["studio", "outdoor", "lifestyle", "flat-lay", "holiday"] as ProductScene[]).map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => setProductScene(s)}
-                          className={`px-3 py-1.5 rounded-full text-xs border transition-all ${
-                            productScene === s
-                              ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                              : "border-[var(--border)] text-[var(--muted)] hover:border-emerald-500/50"
-                          }`}
-                        >
-                          {s === "studio" && "📸 "}
-                          {s === "outdoor" && "🌿 "}
-                          {s === "lifestyle" && "🏠 "}
-                          {s === "flat-lay" && "📐 "}
-                          {s === "holiday" && "🎄 "}
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                    <div>
-                      <label className="text-xs text-[var(--muted)] mb-1 block">Background color (optional)</label>
-                      <input
-                        type="color"
-                        value={productBgColor || "#ffffff"}
-                        onChange={(e) => setProductBgColor(e.target.value)}
-                        className="w-8 h-8 rounded cursor-pointer"
-                      />
-                      {productBgColor && (
-                        <button onClick={() => setProductBgColor("")} className="ml-2 text-xs text-[var(--muted)] hover:text-[var(--foreground)]">Clear</button>
-                      )}
-                    </div>
-                    <button
-                      onClick={handleProductPhoto}
-                      disabled={productLoading}
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 rounded-[8px] h-9 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {productLoading ? "Generating..." : `Generate ${productScene} shot`}
-                    </button>
-                  </div>
-                )}
-
                 {/* Object replacement panel */}
                 {replaceOpen && !inpaintMode && (
                   <div className="bg-[var(--surface)] rounded-[12px] border border-orange-500/30 p-4 space-y-3">
@@ -2896,131 +1760,6 @@ export default function Home() {
                     >
                       {replaceLoading ? "Replacing..." : "Replace Object"}
                     </button>
-                  </div>
-                )}
-
-                {/* Depth map side-by-side view */}
-                {depthMapView && depthMapResult && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--foreground)]">Depth Map</span>
-                      <button onClick={() => setDepthMapView(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">Close</button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-[var(--muted)] mb-1">Original</p>
-                        <img src={getImageUrl(result!.id)} alt="Original" className="w-full rounded-[8px]" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-[var(--muted)] mb-1">Depth Map</p>
-                        <img src={getImageUrl(depthMapResult.id)} alt="Depth map" className="w-full rounded-[8px]" />
-                      </div>
-                    </div>
-                    <a
-                      href={getDownloadUrl(depthMapResult.id, "png")}
-                      className="block text-center w-full bg-[var(--primary)] hover:bg-blue-600 rounded-[8px] h-9 leading-9 text-sm text-white transition-colors"
-                    >
-                      Download Depth Map
-                    </a>
-                  </div>
-                )}
-
-                {/* GIF export panel */}
-                {gifOpen && !inpaintMode && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-pink-500/30 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[var(--foreground)]">Export as GIF</span>
-                      <button onClick={() => setGifOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">Close</button>
-                    </div>
-                    <div>
-                      <span className="text-xs text-[var(--muted)] mb-2 block">Effect</span>
-                      <div className="flex flex-wrap gap-2">
-                        {(["zoom", "pan", "rotate", "pulse", "fade"] as GifEffect[]).map((e) => (
-                          <button
-                            key={e}
-                            onClick={() => setGifEffect(e)}
-                            className={`px-3 py-1.5 rounded-full text-xs border transition-all ${
-                              gifEffect === e
-                                ? "bg-pink-500/20 border-pink-500 text-pink-400"
-                                : "border-[var(--border)] text-[var(--muted)] hover:border-pink-500/50"
-                            }`}
-                          >
-                            {e === "zoom" && "🔍 "}
-                            {e === "pan" && "↔️ "}
-                            {e === "rotate" && "🔄 "}
-                            {e === "pulse" && "💓 "}
-                            {e === "fade" && "🌅 "}
-                            {e.charAt(0).toUpperCase() + e.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--muted)] w-16">Duration</span>
-                      <input
-                        type="range"
-                        min={1}
-                        max={5}
-                        step={0.5}
-                        value={gifDuration}
-                        onChange={(e) => setGifDuration(parseFloat(e.target.value))}
-                        className="flex-1 accent-pink-500"
-                      />
-                      <span className="text-xs text-[var(--foreground)] w-10 text-right">{gifDuration}s</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--muted)] w-16">FPS</span>
-                      <div className="flex gap-2">
-                        {[10, 15, 24].map((f) => (
-                          <button
-                            key={f}
-                            onClick={() => setGifFps(f)}
-                            className={`px-3 py-1 rounded-full text-xs transition-all ${
-                              gifFps === f
-                                ? "bg-pink-500 text-white"
-                                : "bg-[var(--border)] text-[var(--muted)] hover:bg-pink-500/30"
-                            }`}
-                          >
-                            {f}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleExportGif}
-                      disabled={gifExporting}
-                      className="w-full bg-pink-500 hover:bg-pink-600 rounded-[8px] h-9 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {gifExporting ? "Exporting GIF..." : `Export ${gifEffect} GIF`}
-                    </button>
-                  </div>
-                )}
-
-                {/* Edit history panel */}
-                {historyOpen && editHistory.length > 0 && !inpaintMode && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-4 space-y-2 max-h-[250px] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-[var(--foreground)]">Edit History</span>
-                      <button onClick={() => setHistoryOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
-                        Close
-                      </button>
-                    </div>
-                    {editHistory.map((entry, i) => (
-                      <div
-                        key={entry.id}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-[8px] text-sm ${
-                          entry.id === result?.id
-                            ? "bg-[var(--primary)]/20 text-[var(--foreground)] border border-[var(--primary)]/30"
-                            : "text-[var(--muted)] hover:bg-[var(--border)]"
-                        }`}
-                      >
-                        <span className="text-xs text-[var(--muted)] w-5">{i + 1}</span>
-                        <span className="capitalize">{entry.edit_type.replace("_", " ")}</span>
-                        <span className="text-xs text-[var(--muted)] ml-auto">
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    ))}
                   </div>
                 )}
 
@@ -3131,41 +1870,7 @@ export default function Home() {
                 {result.enhanced_prompt && (
                   <div className="p-4 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]">
                     <p className="text-xs text-[var(--muted)] mb-1">Enhanced prompt:</p>
-                    <p className="text-sm text-gray-300">{result.enhanced_prompt}</p>
-                  </div>
-                )}
-
-                {/* Refinement Thread */}
-                {thread.length > 2 && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                    {thread.map((item, i) => (
-                      <div key={i}>
-                        {item.type === "prompt" && (
-                          <div className="bg-[var(--border)] rounded-[12px] px-4 py-3 text-sm text-[var(--foreground)]">
-                            {item.text}
-                          </div>
-                        )}
-                        {item.type === "refinement" && (
-                          <div>
-                            <span className="text-xs text-[var(--muted)] italic">Refinement:</span>
-                            <div className="bg-[var(--border)] rounded-[12px] px-4 py-3 text-sm text-[var(--foreground)] italic mt-1">
-                              {item.text}
-                            </div>
-                          </div>
-                        )}
-                        {item.type === "image" && item.image && i > 0 && i < thread.length - 1 && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={getImageUrl(item.image.id)}
-                            alt="Refined"
-                            className="w-full rounded-[12px] max-h-[300px] object-cover"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {refining && (
-                      <div className="h-32 bg-[var(--border)] rounded-[12px] animate-pulse" />
-                    )}
+                    <p className="text-sm text-[var(--foreground)] opacity-80">{result.enhanced_prompt}</p>
                   </div>
                 )}
 

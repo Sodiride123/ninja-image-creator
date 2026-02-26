@@ -45,7 +45,7 @@ def generate_image(
     size: str = "1024x1024",
     output: str = "generated_image.png",
     n: int = 1,
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> str:
     """
     Generate an image from a text prompt.
@@ -126,7 +126,7 @@ def edit_image(
     model: str = "gpt-image",
     size: str = "1024x1024",
     output: str = "edited_image.png",
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> str:
     """
     Edit an image using the native image edit API (inpainting).
@@ -209,7 +209,7 @@ def generate_images(
     n: int = 2,
     output_dir: str = ".",
     prefix: str = "image",
-    timeout: int = 180,
+    timeout: int = 300,
 ) -> list[str]:
     """
     Generate multiple images from a single prompt.

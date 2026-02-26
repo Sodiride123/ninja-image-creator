@@ -55,17 +55,19 @@ def submit_video(
     model: str = DEFAULT_VIDEO_MODEL,
     size: str = "1280x720",
     seconds: int = 8,
-    timeout: int = 60,
+    image_path: str | None = None,
+    timeout: int = 300,
 ) -> str:
     """
     Submit a video generation request (non-blocking).
 
     Args:
-        prompt:  Text description of the desired video.
-        model:   Model alias or full ID. Options: "sora", "sora-pro".
-        size:    Video dimensions. "1280x720" (landscape) or "720x1280" (portrait).
-        seconds: Video duration in seconds (max 8).
-        timeout: Request timeout in seconds.
+        prompt:     Text description of the desired video.
+        model:      Model alias or full ID. Options: "sora", "sora-pro".
+        size:       Video dimensions. "1280x720" (landscape) or "720x1280" (portrait).
+        seconds:    Video duration in seconds (max 8).
+        image_path: Optional path to a source image for image-to-video.
+        timeout:    Request timeout in seconds.
 
     Returns:
         The video_id string for polling and download.
@@ -86,19 +88,45 @@ def submit_video(
 
     model_id = resolve_model(model)
 
-    payload = {
-        "model": model_id,
-        "prompt": prompt,
-        "seconds": str(seconds),
-        "size": size,
-    }
+    auth_header = {"Authorization": get_headers()["Authorization"]}
 
-    r = requests.post(
-        api_url("/v1/videos"),
-        headers=get_headers(),
-        json=payload,
-        timeout=timeout,
-    )
+    if image_path:
+        # Image-to-video: use multipart/form-data with input_reference
+        import mimetypes
+        mime_type = mimetypes.guess_type(image_path)[0] or "image/png"
+        files = {
+            "input_reference": (Path(image_path).name, open(image_path, "rb"), mime_type),
+        }
+        data = {
+            "model": model_id,
+            "prompt": prompt,
+            "seconds": str(seconds),
+            "size": size,
+        }
+        try:
+            r = requests.post(
+                api_url("/v1/videos"),
+                headers=auth_header,
+                data=data,
+                files=files,
+                timeout=timeout,
+            )
+        finally:
+            files["input_reference"][1].close()
+    else:
+        # Text-to-video: use JSON payload
+        payload = {
+            "model": model_id,
+            "prompt": prompt,
+            "seconds": str(seconds),
+            "size": size,
+        }
+        r = requests.post(
+            api_url("/v1/videos"),
+            headers=get_headers(),
+            json=payload,
+            timeout=timeout,
+        )
 
     if r.status_code != 200:
         error = r.json().get("error", {}).get("message", r.text[:300])
@@ -112,7 +140,7 @@ def submit_video(
     return video_id
 
 
-def check_video_status(video_id: str, timeout: int = 30) -> dict:
+def check_video_status(video_id: str, timeout: int = 60) -> dict:
     """
     Check the status of a video generation job.
 
@@ -144,7 +172,7 @@ def check_video_status(video_id: str, timeout: int = 30) -> dict:
 def poll_video(
     video_id: str,
     interval: int = 5,
-    max_wait: int = 300,
+    max_wait: int = 600,
     verbose: bool = True,
 ) -> str:
     """
@@ -194,7 +222,7 @@ def poll_video(
 def download_video(
     video_id: str,
     output: str = "generated_video.mp4",
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> str:
     """
     Download a completed video.
@@ -234,7 +262,7 @@ def generate_video(
     size: str = "1280x720",
     seconds: int = 8,
     output: str = "generated_video.mp4",
-    max_wait: int = 300,
+    max_wait: int = 600,
     verbose: bool = True,
 ) -> str:
     """

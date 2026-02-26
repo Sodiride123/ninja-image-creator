@@ -45,10 +45,6 @@ VIDEOS_DB_PATH = VIDEOS_DIR / "videos_db.json"
 
 COLLECTIONS_DB_PATH = IMAGES_DIR / "collections_db.json"
 PROMPTS_DB_PATH = IMAGES_DIR / "prompts_db.json"
-CHARACTER_PROFILES_DB_PATH = IMAGES_DIR / "character_profiles_db.json"
-BRAND_KITS_DB_PATH = IMAGES_DIR / "brand_kits_db.json"
-STYLE_PRESETS_DB_PATH = IMAGES_DIR / "style_presets_db.json"
-BATCH_JOBS_DB_PATH = IMAGES_DIR / "batch_jobs_db.json"
 
 # ---------------------------------------------------------------------------
 # CORS — read sandbox metadata for allowed origins
@@ -120,38 +116,6 @@ def load_prompts_db() -> list[dict]:
 def save_prompts_db(records: list[dict]):
     PROMPTS_DB_PATH.write_text(json.dumps(records, indent=2))
 
-def load_character_profiles_db() -> list[dict]:
-    if CHARACTER_PROFILES_DB_PATH.exists():
-        return json.loads(CHARACTER_PROFILES_DB_PATH.read_text())
-    return []
-
-def save_character_profiles_db(records: list[dict]):
-    CHARACTER_PROFILES_DB_PATH.write_text(json.dumps(records, indent=2))
-
-def load_brand_kits_db() -> list[dict]:
-    if BRAND_KITS_DB_PATH.exists():
-        return json.loads(BRAND_KITS_DB_PATH.read_text())
-    return []
-
-def save_brand_kits_db(records: list[dict]):
-    BRAND_KITS_DB_PATH.write_text(json.dumps(records, indent=2))
-
-def load_style_presets_db() -> list[dict]:
-    if STYLE_PRESETS_DB_PATH.exists():
-        return json.loads(STYLE_PRESETS_DB_PATH.read_text())
-    return []
-
-def save_style_presets_db(records: list[dict]):
-    STYLE_PRESETS_DB_PATH.write_text(json.dumps(records, indent=2))
-
-def load_batch_jobs_db() -> list[dict]:
-    if BATCH_JOBS_DB_PATH.exists():
-        return json.loads(BATCH_JOBS_DB_PATH.read_text())
-    return []
-
-def save_batch_jobs_db(records: list[dict]):
-    BATCH_JOBS_DB_PATH.write_text(json.dumps(records, indent=2))
-
 def save_prompt_history(prompt: str):
     """Auto-save prompt to history, dedup within 5 minutes."""
     db = load_prompts_db()
@@ -181,9 +145,7 @@ class GenerateRequest(BaseModel):
     size: str = Field(default="1024x1024")
     enhance: bool = Field(default=False)
     count: int = Field(default=1, ge=1, le=4)
-    character_profile_id: str | None = Field(default=None)
     text_overlay: dict | None = Field(default=None)
-    brand_kit_id: str | None = Field(default=None)
 
 class EnhancePromptRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
@@ -246,13 +208,6 @@ class TextOverlay(BaseModel):
     font_hint: str = Field(default="bold")
     placement: str = Field(default="center")
 
-class CreateCharacterProfileRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-
-class CreateBrandKitRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    colors: list[str] = Field(..., min_length=1, max_length=6)
-    style_notes: str = Field(default="")
 
 # ---------------------------------------------------------------------------
 # Style presets
@@ -374,9 +329,7 @@ async def generate(req: GenerateRequest):
 
     generation_prompt, enhanced_prompt = _build_prompt(req.prompt, req.style, req.enhance)
     # Sprint 7: apply character profile, text overlay, and brand kit
-    generation_prompt = _apply_character_profile(generation_prompt, req.character_profile_id)
     generation_prompt = _apply_text_overlay(generation_prompt, req.text_overlay)
-    generation_prompt = _apply_brand_kit(generation_prompt, req.brand_kit_id)
 
     group_id = str(uuid.uuid4()) if req.count > 1 else None
     now = datetime.utcnow().isoformat()
@@ -398,9 +351,7 @@ async def generate(req: GenerateRequest):
             "style": req.style,
             "size": req.size,
             "filename": filename,
-            "character_profile_id": req.character_profile_id,
             "text_overlay": req.text_overlay,
-            "brand_kit_id": req.brand_kit_id,
             "created_at": now,
         }
         db = load_db()
@@ -427,9 +378,7 @@ async def generate(req: GenerateRequest):
                         "size": req.size,
                         "filename": filename,
                         "group_id": group_id,
-                        "character_profile_id": req.character_profile_id,
                         "text_overlay": req.text_overlay,
-                        "brand_kit_id": req.brand_kit_id,
                         "created_at": now,
                     })
                 except Exception as e:
@@ -1077,19 +1026,36 @@ async def image_to_video(req: ImageToVideoRequest):
     video_id_internal = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
-    # Submit with motion prompt — append image context to the prompt
-    motion_prompt = f"{req.prompt} (animate the scene, camera motion, subtle movements)"
+    # Resize source image to match video dimensions (required by Sora API)
+    video_w, video_h = map(int, video_size.split("x"))
+    resized_path = IMAGES_DIR / f"temp_video_{req.image_id}.png"
+    img = Image.open(parent_path).convert("RGB")
+    img_resized = img.resize((video_w, video_h), Image.LANCZOS)
+    img_resized.save(resized_path, "PNG")
+
+    # Send the actual source image via input_reference for image-to-video
+    # No need to prepend parent prompt — the image itself is sent as reference
+    motion_prompt = req.prompt
     sora_video_id = None
     used_model = None
     last_error = None
     for model in models_to_try:
         try:
-            sora_video_id = submit_video(prompt=motion_prompt, model=model, size=video_size, seconds=8)
+            sora_video_id = submit_video(
+                prompt=motion_prompt,
+                model=model,
+                size=video_size,
+                seconds=8,
+                image_path=str(resized_path),
+            )
             used_model = model
             break
         except Exception as e:
             last_error = e
             continue
+    # Clean up temp resized image
+    resized_path.unlink(missing_ok=True)
+
     if not sora_video_id:
         raise HTTPException(500, f"Video submission failed: {last_error}")
 
@@ -1484,206 +1450,6 @@ async def remove_video_from_collection(collection_id: str, video_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Sprint 6: Outpainting / Canvas Extension (#88)
-# ---------------------------------------------------------------------------
-
-class OutpaintRequest(BaseModel):
-    directions: list[str] = Field(..., min_length=1)
-    amount: int = Field(default=50, ge=10, le=100)  # percentage of original dimension
-
-
-@app.post("/api/images/{image_id}/outpaint")
-async def outpaint_image(image_id: str, req: OutpaintRequest):
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    filepath = IMAGES_DIR / record["filename"]
-    if not filepath.exists():
-        raise HTTPException(404, "Image file not found")
-
-    valid_dirs = {"up", "down", "left", "right"}
-    for d in req.directions:
-        if d not in valid_dirs:
-            raise HTTPException(400, f"Invalid direction: {d}. Use: {valid_dirs}")
-
-    img = Image.open(filepath).convert("RGBA")
-    orig_w, orig_h = img.size
-
-    # Calculate extension pixels for each direction
-    ext_up = int(orig_h * req.amount / 100) if "up" in req.directions else 0
-    ext_down = int(orig_h * req.amount / 100) if "down" in req.directions else 0
-    ext_left = int(orig_w * req.amount / 100) if "left" in req.directions else 0
-    ext_right = int(orig_w * req.amount / 100) if "right" in req.directions else 0
-
-    new_w = orig_w + ext_left + ext_right
-    new_h = orig_h + ext_up + ext_down
-
-    # Build the extended prompt
-    direction_text = " and ".join(req.directions)
-    outpaint_prompt = f"Seamlessly extend this image {direction_text}, maintaining consistent style, lighting, and perspective. The original image content should blend naturally with the new areas. Size: {new_w}x{new_h}"
-
-    # Generate the extended image using AI
-    try:
-        # Save original as temp for reference
-        temp_path = IMAGES_DIR / f"temp_outpaint_{image_id}.png"
-        img.save(temp_path, "PNG")
-
-        # Use the original prompt + outpaint instruction
-        orig_prompt = record.get("prompt", "")
-        full_prompt = f"{orig_prompt}. {outpaint_prompt}" if orig_prompt else outpaint_prompt
-
-        # Pick closest valid generation size, resize to target after
-        if new_w > new_h:
-            gen_size = "1536x1024"
-        elif new_h > new_w:
-            gen_size = "1024x1536"
-        else:
-            gen_size = "1024x1024"
-
-        new_id = str(uuid.uuid4())
-        new_filename = f"{new_id}.png"
-        new_path = IMAGES_DIR / new_filename
-
-        generate_image(
-            prompt=full_prompt,
-            model="gemini-image",
-            size=gen_size,
-            output=str(new_path),
-        )
-
-        # Resize to exact target dimensions
-        outpainted = Image.open(new_path).convert("RGBA")
-        outpainted = outpainted.resize((new_w, new_h), Image.LANCZOS)
-        outpainted.save(new_path, "PNG")
-
-        # Clean up temp
-        temp_path.unlink(missing_ok=True)
-
-        new_record = {
-            "id": new_id,
-            "prompt": record.get("prompt", ""),
-            "parent_id": image_id,
-            "style": record.get("style", "none"),
-            "size": f"{new_w}x{new_h}",
-            "filename": new_filename,
-            "outpainted": True,
-            "outpaint_directions": req.directions,
-            "outpaint_amount": req.amount,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-        db.append(new_record)
-        save_db(db)
-
-        return new_record
-    except Exception as e:
-        raise HTTPException(500, f"Outpainting failed: {str(e)}")
-
-
-# ---------------------------------------------------------------------------
-# Sprint 6: Edit History with Undo/Redo (#90)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/images/{image_id}/history")
-async def get_image_history(image_id: str):
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    # Walk backwards through parent chain to find root
-    chain = [record]
-    current = record
-    while current.get("parent_id"):
-        parent = next((r for r in db if r["id"] == current["parent_id"]), None)
-        if not parent:
-            break
-        chain.append(parent)
-        current = parent
-
-    chain.reverse()  # oldest first
-
-    # Find current position in chain
-    current_index = next((i for i, r in enumerate(chain) if r["id"] == image_id), len(chain) - 1)
-
-    # Build history entries
-    history = []
-    for i, r in enumerate(chain):
-        edit_type = "original"
-        if r.get("outpainted"):
-            edit_type = "outpaint"
-        elif r.get("adjusted"):
-            edit_type = "adjust"
-        elif r.get("upscaled"):
-            edit_type = "upscale"
-        elif r.get("background_removed"):
-            edit_type = "background_removal"
-        elif r.get("style_transfer"):
-            edit_type = "style_transfer"
-        elif r.get("watermarked"):
-            edit_type = "watermark"
-        elif r.get("parent_id") and i > 0:
-            edit_type = "refine"
-
-        history.append({
-            "id": r["id"],
-            "edit_type": edit_type,
-            "timestamp": r.get("created_at", ""),
-            "params": {
-                k: v for k, v in r.items()
-                if k in ("adjustments", "upscale_factor", "outpaint_directions", "outpaint_amount", "style_strength", "watermark_text")
-            },
-        })
-
-    # Find children for redo
-    children = [r for r in db if r.get("parent_id") == image_id]
-
-    return {
-        "image_id": image_id,
-        "history": history,
-        "current_index": current_index,
-        "can_undo": current_index > 0,
-        "can_redo": len(children) > 0,
-    }
-
-
-@app.post("/api/images/{image_id}/undo")
-async def undo_image(image_id: str):
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    parent_id = record.get("parent_id")
-    if not parent_id:
-        raise HTTPException(400, "Nothing to undo — this is the original image")
-
-    parent = next((r for r in db if r["id"] == parent_id), None)
-    if not parent:
-        raise HTTPException(404, "Parent image not found")
-
-    return parent
-
-
-@app.post("/api/images/{image_id}/redo")
-async def redo_image(image_id: str):
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    # Find the most recent child
-    children = [r for r in db if r.get("parent_id") == image_id]
-    if not children:
-        raise HTTPException(400, "Nothing to redo — no forward edits")
-
-    # Return the most recent child
-    children.sort(key=lambda r: r.get("created_at", ""), reverse=True)
-    return children[0]
-
-
-# ---------------------------------------------------------------------------
 # Sprint 6: Image Watermarking (#92)
 # ---------------------------------------------------------------------------
 
@@ -1725,18 +1491,54 @@ async def watermark_image(image_id: str, req: WatermarkRequest):
     txt_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(txt_layer)
 
-    # Try to use a font, fall back to default
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", req.font_size)
-    except (OSError, IOError):
-        font = ImageFont.load_default()
+    # Try common font paths across Linux and macOS, fall back to default
+    font = None
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",       # Linux
+        "/System/Library/Fonts/Helvetica.ttc",                     # macOS
+        "/System/Library/Fonts/SFNSText.ttf",                     # macOS
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ]
+    for fp in font_paths:
+        try:
+            font = ImageFont.truetype(fp, req.font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default(size=req.font_size)
+
+    # Scale font size relative to image width so watermark is always visible
+    # User's font_size is treated as a base for a 1024px-wide image
+    scale_factor = img.width / 1024.0
+    actual_font_size = max(int(req.font_size * scale_factor), 16)
+
+    # Re-load font at scaled size
+    font = None
+    for fp in font_paths:
+        try:
+            font = ImageFont.truetype(fp, actual_font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default(size=actual_font_size)
 
     bbox = draw.textbbox((0, 0), req.text, font=font)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
     fill = (r_val, g_val, b_val, alpha)
+    # Shadow color: inverted luminance for contrast
+    shadow_alpha = min(alpha, 180)
+    shadow_fill = (0, 0, 0, shadow_alpha) if (r_val + g_val + b_val) > 384 else (255, 255, 255, shadow_alpha)
+    shadow_offset = max(2, actual_font_size // 20)
     padding = 20
+
+    def _draw_text_with_shadow(d: ImageDraw.Draw, pos: tuple, text: str):
+        """Draw text with a shadow for contrast on any background."""
+        d.text((pos[0] + shadow_offset, pos[1] + shadow_offset), text, font=font, fill=shadow_fill)
+        d.text(pos, text, font=font, fill=fill)
 
     if req.position == "tiled":
         # Tile the watermark at 45 degrees across the image
@@ -1745,7 +1547,7 @@ async def watermark_image(image_id: str, req: WatermarkRequest):
             for x in range(-img.width, img.width * 2, text_w + 80):
                 tile_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
                 tile_draw = ImageDraw.Draw(tile_layer)
-                tile_draw.text((x, y), req.text, font=font, fill=fill)
+                _draw_text_with_shadow(tile_draw, (x, y), req.text)
                 tile_layer = tile_layer.rotate(45, center=(img.width // 2, img.height // 2), expand=False)
                 txt_layer = Image.alpha_composite(txt_layer, tile_layer)
     else:
@@ -1757,7 +1559,7 @@ async def watermark_image(image_id: str, req: WatermarkRequest):
             "top-left": (padding, padding),
         }
         pos = positions[req.position]
-        draw.text(pos, req.text, font=font, fill=fill)
+        _draw_text_with_shadow(draw, pos, req.text)
 
     watermarked = Image.alpha_composite(img, txt_layer)
     watermarked_rgb = watermarked.convert("RGB")
@@ -1790,86 +1592,8 @@ async def watermark_image(image_id: str, req: WatermarkRequest):
 # Sprint 7: Character Consistency
 # ---------------------------------------------------------------------------
 
-@app.post("/api/character-profiles")
-async def create_character_profile(
-    name: str = Form(..., min_length=1, max_length=100),
-    images: list[UploadFile] = File(...),
-):
-    if len(images) < 1 or len(images) > 3:
-        raise HTTPException(400, "Must upload 1-3 reference images")
-
-    profile_id = str(uuid.uuid4())
-    ref_filenames = []
-
-    for img_file in images:
-        if img_file.content_type not in ("image/png", "image/jpeg", "image/webp"):
-            raise HTTPException(400, f"Invalid file type: {img_file.content_type}")
-        content = await img_file.read()
-        if len(content) > 10 * 1024 * 1024:
-            raise HTTPException(400, "File too large (max 10MB)")
-        ref_id = str(uuid.uuid4())
-        ref_filename = f"charref_{ref_id}.png"
-        ref_path = IMAGES_DIR / ref_filename
-        img = Image.open(BytesIO(content))
-        img.save(ref_path, "PNG")
-        ref_filenames.append(ref_filename)
-
-    # Analyze reference images with claude-haiku to extract identity descriptors
-    identity_desc = ""
-    try:
-        analysis_prompt = (
-            f"You are analyzing reference images for a character named '{name}'. "
-            "Describe the character's key visual identity traits for consistent image generation: "
-            "facial features (face shape, eyes, nose, mouth), hair (color, length, style), "
-            "skin tone, body type, and any distinctive features (glasses, scars, tattoos, etc). "
-            "Be specific and concise. Return only the description, no preamble."
-        )
-        identity_desc = chat(
-            analysis_prompt,
-            model="claude-haiku",
-            system="You extract character identity descriptors from descriptions for AI image generation.",
-            max_tokens=300,
-            temperature=0.3,
-        )
-    except Exception:
-        identity_desc = f"a character named {name}"
-
-    profile = {
-        "id": profile_id,
-        "name": name,
-        "reference_images": ref_filenames,
-        "identity_descriptors": identity_desc,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-
-    db = load_character_profiles_db()
-    db.append(profile)
-    save_character_profiles_db(db)
-    return profile
-
-
-@app.get("/api/character-profiles")
-async def list_character_profiles():
-    return load_character_profiles_db()
-
-
-@app.delete("/api/character-profiles/{profile_id}")
-async def delete_character_profile(profile_id: str):
-    db = load_character_profiles_db()
-    profile = next((p for p in db if p["id"] == profile_id), None)
-    if not profile:
-        raise HTTPException(404, "Character profile not found")
-    for ref_file in profile.get("reference_images", []):
-        ref_path = IMAGES_DIR / ref_file
-        if ref_path.exists():
-            ref_path.unlink()
-    db = [p for p in db if p["id"] != profile_id]
-    save_character_profiles_db(db)
-    return {"status": "deleted", "id": profile_id}
-
-
 # ---------------------------------------------------------------------------
-# Sprint 7: Text-in-Image + Character + Brand Kit prompt helpers
+# Sprint 7: Text-in-Image prompt helper
 # ---------------------------------------------------------------------------
 
 def _apply_text_overlay(prompt: str, text_overlay: dict | None) -> str:
@@ -1892,79 +1616,6 @@ def _apply_text_overlay(prompt: str, text_overlay: dict | None) -> str:
         f'positioned at the {placement} of the image'
     )
     return prompt + text_instruction
-
-
-def _apply_character_profile(prompt: str, profile_id: str | None) -> str:
-    """Prepend character identity descriptors to the prompt."""
-    if not profile_id:
-        return prompt
-    profiles = load_character_profiles_db()
-    profile = next((p for p in profiles if p["id"] == profile_id), None)
-    if not profile:
-        return prompt
-    identity = profile.get("identity_descriptors", "")
-    if identity:
-        return f"{identity}. {prompt}"
-    return prompt
-
-
-def _apply_brand_kit(prompt: str, brand_kit_id: str | None) -> str:
-    """Append brand color palette instructions to the prompt."""
-    if not brand_kit_id:
-        return prompt
-    kits = load_brand_kits_db()
-    kit = next((k for k in kits if k["id"] == brand_kit_id), None)
-    if not kit:
-        return prompt
-    colors = kit.get("colors", [])
-    if colors:
-        color_str = ", ".join(colors)
-        prompt += f", using only these brand colors: {color_str}"
-    notes = kit.get("style_notes", "")
-    if notes:
-        prompt += f", {notes}"
-    return prompt
-
-
-# ---------------------------------------------------------------------------
-# Sprint 7: Brand Kits
-# ---------------------------------------------------------------------------
-
-@app.post("/api/brand-kits")
-async def create_brand_kit(req: CreateBrandKitRequest):
-    import re as _re
-    for color in req.colors:
-        if not _re.match(r'^#[0-9a-fA-F]{6}$', color):
-            raise HTTPException(400, f"Invalid hex color: {color}. Use format #RRGGBB")
-
-    kit_id = str(uuid.uuid4())
-    kit = {
-        "id": kit_id,
-        "name": req.name,
-        "colors": req.colors,
-        "style_notes": req.style_notes,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-    db = load_brand_kits_db()
-    db.append(kit)
-    save_brand_kits_db(db)
-    return kit
-
-
-@app.get("/api/brand-kits")
-async def list_brand_kits():
-    return load_brand_kits_db()
-
-
-@app.delete("/api/brand-kits/{kit_id}")
-async def delete_brand_kit(kit_id: str):
-    db = load_brand_kits_db()
-    kit = next((k for k in db if k["id"] == kit_id), None)
-    if not kit:
-        raise HTTPException(404, "Brand kit not found")
-    db = [k for k in db if k["id"] != kit_id]
-    save_brand_kits_db(db)
-    return {"status": "deleted", "id": kit_id}
 
 
 # ---------------------------------------------------------------------------
@@ -2018,78 +1669,6 @@ async def export_svg(image_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Sprint 8: AI Product Photography
-# ---------------------------------------------------------------------------
-
-PRODUCT_SCENES = {"studio", "outdoor", "lifestyle", "flat-lay", "holiday"}
-
-
-@app.post("/api/images/{image_id}/product-photo")
-async def product_photo(
-    image_id: str,
-    scene: str = Form(...),
-    background_color: str = Form(default=""),
-):
-    """Generate a professional product mockup from an existing image."""
-    if scene not in PRODUCT_SCENES:
-        raise HTTPException(400, f"Invalid scene. Choose from: {', '.join(sorted(PRODUCT_SCENES))}")
-
-    if background_color and not re.match(r'^#[0-9a-fA-F]{6}$', background_color):
-        raise HTTPException(400, "Invalid background_color hex. Use format #RRGGBB")
-
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    # Analyze the product using claude-haiku
-    product_description = chat(
-        f"Describe this product in one sentence based on its generation prompt: '{record.get('prompt', 'a product')}'. Focus on the physical object only.",
-        model="claude-haiku",
-    )
-
-    scene_templates = {
-        "studio": "Professional studio photography with soft lighting, clean white backdrop, subtle shadows, commercial product shot",
-        "outdoor": "Natural outdoor setting with soft golden hour lighting, blurred nature background, lifestyle product photography",
-        "lifestyle": "Styled lifestyle scene with modern decor, warm ambient lighting, aspirational setting, editorial product placement",
-        "flat-lay": "Top-down flat lay arrangement on clean surface, organized accessories, minimalist styling, Instagram-worthy",
-        "holiday": "Festive holiday scene with seasonal decorations, warm cozy lighting, gift-wrapped elements, celebration mood",
-    }
-
-    bg_instruction = f" Background color: {background_color}." if background_color else ""
-    generation_prompt = f"{product_description}. {scene_templates[scene]}.{bg_instruction} Professional product photography, high resolution, commercial quality."
-
-    # Generate the product photo
-    new_id = str(uuid.uuid4())
-    filename = f"{new_id}.png"
-    file_path = IMAGES_DIR / filename
-
-    generate_image(prompt=generation_prompt, model="gemini-image", size="1024x1024", output=str(file_path))
-    try:
-        postprocess_image(str(file_path), "1024x1024")
-    except Exception:
-        pass
-
-    new_record = {
-        "id": new_id,
-        "prompt": generation_prompt,
-        "original_prompt": record.get("prompt", ""),
-        "model": "gemini-image",
-        "size": "1024x1024",
-        "style": "none",
-        "filename": filename,
-        "created_at": datetime.utcnow().isoformat(),
-        "parent_id": image_id,
-        "edit_type": "product_photo",
-        "scene": scene,
-    }
-
-    db.append(new_record)
-    save_db(db)
-    return new_record
-
-
-# ---------------------------------------------------------------------------
 # Sprint 8: Smart Object Replacement
 # ---------------------------------------------------------------------------
 
@@ -2112,27 +1691,38 @@ async def replace_object(
         raise HTTPException(404, "Image not found")
 
     original_prompt = record.get("prompt", "")
-
-    # Use claude-haiku to build a replacement prompt
-    style_instruction = " Maintain the exact same artistic style, lighting, color palette, and composition." if preserve_style else ""
-    replacement_prompt = chat(
-        f"An image was generated with this prompt: '{original_prompt}'. "
-        f"The user wants to replace '{target_object}' with '{replacement}'. "
-        f"Rewrite the prompt so the new image has '{replacement}' instead of '{target_object}', "
-        f"keeping everything else the same.{style_instruction} "
-        "Return ONLY the new prompt, nothing else.",
-        model="claude-haiku",
-    )
-
-    generation_prompt = replacement_prompt.strip()
     original_size = record.get("size", "1024x1024")
-    w, h = map(int, original_size.split("x"))
+    source_path = IMAGES_DIR / record["filename"]
+    if not source_path.exists():
+        raise HTTPException(404, "Source image file not found")
+
+    # Build an edit prompt that tells the model what to replace
+    style_instruction = " Maintain the exact same artistic style, lighting, color palette, and composition." if preserve_style else ""
+    edit_prompt = f"Replace '{target_object}' with '{replacement}' in this image, keeping everything else exactly the same.{style_instruction}"
 
     new_id = str(uuid.uuid4())
     filename = f"{new_id}.png"
     file_path = IMAGES_DIR / filename
 
-    generate_image(prompt=generation_prompt, model="gemini-image", size=original_size, output=str(file_path))
+    # Use image edit API so the model sees the actual source image
+    IMAGE_MODELS_EDIT = ["gpt-image"]  # edit_image only works with gpt-image
+    last_error = None
+    for model in IMAGE_MODELS_EDIT:
+        try:
+            edit_image(
+                image_path=str(source_path),
+                prompt=edit_prompt,
+                model=model,
+                size=original_size,
+                output=str(file_path),
+            )
+            break
+        except Exception as e:
+            last_error = e
+            continue
+    else:
+        raise HTTPException(500, f"Object replacement failed: {last_error}")
+
     try:
         postprocess_image(str(file_path), original_size)
     except Exception:
@@ -2140,9 +1730,8 @@ async def replace_object(
 
     new_record = {
         "id": new_id,
-        "prompt": generation_prompt,
+        "prompt": edit_prompt,
         "original_prompt": original_prompt,
-        "model": "gemini-image",
         "size": original_size,
         "style": record.get("style", "none"),
         "filename": filename,
@@ -2157,317 +1746,6 @@ async def replace_object(
     save_db(db)
     return new_record
 
-
-# ---------------------------------------------------------------------------
-# Sprint 8: Depth Map Generation
-# ---------------------------------------------------------------------------
-
-@app.post("/api/images/{image_id}/depth-map")
-async def generate_depth_map(image_id: str):
-    """Generate a pseudo-depth map from an image using edge detection and blur gradients."""
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    src_path = IMAGES_DIR / record["filename"]
-    if not src_path.exists():
-        raise HTTPException(404, "Image file not found on disk")
-
-    img = Image.open(str(src_path)).convert("RGB")
-
-    # Create pseudo-depth map using edge detection + blur
-    grayscale = img.convert("L")
-
-    # Edge detection for detail/depth cues
-    edges = grayscale.filter(ImageFilter.FIND_EDGES)
-
-    # Invert edges (edges = closer objects typically have more detail)
-    from PIL import ImageOps
-    edges_inv = ImageOps.invert(edges)
-
-    # Heavy blur to create smooth depth gradients
-    depth_smooth = edges_inv.filter(ImageFilter.GaussianBlur(radius=15))
-
-    # Add a vertical gradient (top = far, bottom = near) as depth prior
-    w, h = img.size
-    gradient = Image.new("L", (w, h))
-    for y in range(h):
-        val = int(255 * (y / h))  # 0 at top (far), 255 at bottom (near)
-        for x in range(w):
-            gradient.putpixel((x, y), val)
-
-    # Blend edge-based depth with vertical gradient
-    from PIL import ImageChops
-    depth_map = ImageChops.add(depth_smooth, gradient, scale=2, offset=0)
-
-    # Apply final smoothing
-    depth_map = depth_map.filter(ImageFilter.GaussianBlur(radius=8))
-
-    new_id = str(uuid.uuid4())
-    filename = f"{new_id}.png"
-    file_path = IMAGES_DIR / filename
-    depth_map.save(str(file_path), "PNG")
-
-    new_record = {
-        "id": new_id,
-        "prompt": f"Depth map of: {record.get('prompt', 'image')}",
-        "original_prompt": record.get("prompt", ""),
-        "model": "depth-estimation",
-        "size": f"{w}x{h}",
-        "style": "none",
-        "filename": filename,
-        "created_at": datetime.utcnow().isoformat(),
-        "parent_id": image_id,
-        "edit_type": "depth_map",
-    }
-
-    db.append(new_record)
-    save_db(db)
-    return new_record
-
-
-# ---------------------------------------------------------------------------
-# Sprint 9: Batch CSV Generation
-# ---------------------------------------------------------------------------
-
-import csv
-import io
-import threading
-
-# In-memory batch status tracking
-_batch_status: dict[str, dict] = {}
-
-
-@app.post("/api/batch-csv")
-async def batch_csv(file: UploadFile = File(...)):
-    """Accept a CSV with prompts/settings and generate images in parallel."""
-    if not file.filename or not file.filename.endswith(".csv"):
-        raise HTTPException(400, "File must be a .csv")
-
-    content = await file.read()
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(400, "CSV must be UTF-8 encoded")
-
-    reader = csv.DictReader(io.StringIO(text))
-    if "prompt" not in (reader.fieldnames or []):
-        raise HTTPException(400, "CSV must have a 'prompt' column")
-
-    rows = []
-    for i, row in enumerate(reader):
-        if i >= 50:
-            break
-        prompt = (row.get("prompt") or "").strip()
-        if not prompt:
-            continue
-        rows.append({
-            "prompt": prompt,
-            "style": (row.get("style") or "none").strip(),
-            "size": (row.get("size") or "1024x1024").strip(),
-            "enhance": (row.get("enhance") or "false").strip().lower() == "true",
-        })
-
-    if not rows:
-        raise HTTPException(400, "CSV has no valid prompt rows")
-
-    batch_id = str(uuid.uuid4())
-    _batch_status[batch_id] = {
-        "id": batch_id,
-        "total": len(rows),
-        "completed": 0,
-        "failed": 0,
-        "results": [],
-        "status": "processing",
-        "created_at": datetime.utcnow().isoformat(),
-    }
-
-    # Persist initial status
-    jobs_db = load_batch_jobs_db()
-    jobs_db.append(_batch_status[batch_id])
-    save_batch_jobs_db(jobs_db)
-
-    def _run_batch():
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futures = {}
-            for row in rows:
-                f = pool.submit(_generate_single_batch_item, row)
-                futures[f] = row
-
-            for f in as_completed(futures):
-                try:
-                    record = f.result()
-                    _batch_status[batch_id]["results"].append(record)
-                    _batch_status[batch_id]["completed"] += 1
-                except Exception:
-                    _batch_status[batch_id]["failed"] += 1
-
-        _batch_status[batch_id]["status"] = "complete"
-        # Persist final
-        jobs_db2 = load_batch_jobs_db()
-        for j in jobs_db2:
-            if j["id"] == batch_id:
-                j.update(_batch_status[batch_id])
-                break
-        save_batch_jobs_db(jobs_db2)
-
-    threading.Thread(target=_run_batch, daemon=True).start()
-    return {"batch_id": batch_id, "total": len(rows), "status": "processing"}
-
-
-def _generate_single_batch_item(row: dict) -> dict:
-    """Generate a single image for a batch row."""
-    prompt = row["prompt"]
-    size = row.get("size", "1024x1024")
-
-    result = generate_image(prompt=prompt, model="gemini-image", size=size)
-
-    new_id = str(uuid.uuid4())
-    filename = f"{new_id}.png"
-    file_path = IMAGES_DIR / filename
-    w, h = map(int, size.split("x"))
-
-    img_data = base64.b64decode(result["base64"])
-    img = Image.open(BytesIO(img_data))
-    img = postprocess_image(img, w, h)
-    img.save(str(file_path), "PNG")
-
-    record = {
-        "id": new_id,
-        "prompt": prompt,
-        "style": row.get("style", "none"),
-        "size": size,
-        "filename": filename,
-        "model": "gemini-image",
-        "created_at": datetime.utcnow().isoformat(),
-        "edit_type": "batch_csv",
-    }
-
-    db = load_db()
-    db.append(record)
-    save_db(db)
-    return record
-
-
-@app.get("/api/batch-csv/{batch_id}")
-async def get_batch_status(batch_id: str):
-    """Poll batch job status."""
-    if batch_id in _batch_status:
-        return _batch_status[batch_id]
-    jobs = load_batch_jobs_db()
-    job = next((j for j in jobs if j["id"] == batch_id), None)
-    if not job:
-        raise HTTPException(404, "Batch job not found")
-    return job
-
-
-# ---------------------------------------------------------------------------
-# Sprint 9: Style Presets
-# ---------------------------------------------------------------------------
-
-class CreateStylePresetRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    prompt_prefix: str = Field(default="")
-    prompt_suffix: str = Field(default="")
-    style: str = Field(default="none")
-    size: str = Field(default="1024x1024")
-    enhance: bool = Field(default=False)
-    negative_prompt: str = Field(default="")
-
-
-@app.post("/api/style-presets")
-async def create_style_preset(req: CreateStylePresetRequest):
-    preset_id = str(uuid.uuid4())
-    preset = {
-        "id": preset_id,
-        "name": req.name,
-        "prompt_prefix": req.prompt_prefix,
-        "prompt_suffix": req.prompt_suffix,
-        "style": req.style,
-        "size": req.size,
-        "enhance": req.enhance,
-        "negative_prompt": req.negative_prompt,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-    db = load_style_presets_db()
-    db.append(preset)
-    save_style_presets_db(db)
-    return preset
-
-
-@app.get("/api/style-presets")
-async def list_style_presets():
-    return load_style_presets_db()
-
-
-@app.get("/api/style-presets/{preset_id}")
-async def get_style_preset(preset_id: str):
-    db = load_style_presets_db()
-    preset = next((p for p in db if p["id"] == preset_id), None)
-    if not preset:
-        raise HTTPException(404, "Style preset not found")
-    return preset
-
-
-@app.delete("/api/style-presets/{preset_id}")
-async def delete_style_preset(preset_id: str):
-    db = load_style_presets_db()
-    preset = next((p for p in db if p["id"] == preset_id), None)
-    if not preset:
-        raise HTTPException(404, "Style preset not found")
-    db = [p for p in db if p["id"] != preset_id]
-    save_style_presets_db(db)
-    return {"status": "deleted", "id": preset_id}
-
-
-@app.post("/api/style-presets/{preset_id}/apply")
-async def apply_style_preset(preset_id: str, prompt: str = Form(...)):
-    """Apply a style preset to a user prompt and generate."""
-    db = load_style_presets_db()
-    preset = next((p for p in db if p["id"] == preset_id), None)
-    if not preset:
-        raise HTTPException(404, "Style preset not found")
-
-    parts = []
-    if preset.get("prompt_prefix"):
-        parts.append(preset["prompt_prefix"])
-    parts.append(prompt)
-    if preset.get("prompt_suffix"):
-        parts.append(preset["prompt_suffix"])
-    final_prompt = " ".join(parts)
-
-    size = preset.get("size", "1024x1024")
-    result = generate_image(prompt=final_prompt, model="gemini-image", size=size)
-
-    new_id = str(uuid.uuid4())
-    filename = f"{new_id}.png"
-    file_path = IMAGES_DIR / filename
-    w, h = map(int, size.split("x"))
-
-    img_data = base64.b64decode(result["base64"])
-    img = Image.open(BytesIO(img_data))
-    img = postprocess_image(img, w, h)
-    img.save(str(file_path), "PNG")
-
-    new_record = {
-        "id": new_id,
-        "prompt": final_prompt,
-        "original_prompt": prompt,
-        "model": "gemini-image",
-        "size": size,
-        "style": preset.get("style", "none"),
-        "filename": filename,
-        "created_at": datetime.utcnow().isoformat(),
-        "edit_type": "style_preset",
-        "preset_id": preset_id,
-        "preset_name": preset.get("name", ""),
-    }
-
-    images_db = load_db()
-    images_db.append(new_record)
-    save_db(images_db)
-    return new_record
 
 
 # ---------------------------------------------------------------------------
@@ -2524,99 +1802,3 @@ async def detect_script_endpoint(text: str = Form(...)):
     return {"text": text, "detected_script": detected, "direction": direction}
 
 
-# ---------------------------------------------------------------------------
-# Sprint 9: GIF Animation Export
-# ---------------------------------------------------------------------------
-
-GIF_EFFECTS = {"zoom", "pan", "rotate", "pulse", "fade"}
-
-
-@app.post("/api/images/{image_id}/export-gif")
-async def export_gif(
-    image_id: str,
-    effect: str = Form(default="zoom"),
-    duration: float = Form(default=2.0),
-    fps: int = Form(default=15),
-):
-    """Generate an animated GIF from a static image with effects."""
-    if effect not in GIF_EFFECTS:
-        raise HTTPException(400, f"Invalid effect. Choose from: {', '.join(sorted(GIF_EFFECTS))}")
-    if not (1 <= duration <= 5):
-        raise HTTPException(400, "Duration must be between 1 and 5 seconds")
-    if fps not in (10, 15, 24):
-        raise HTTPException(400, "FPS must be 10, 15, or 24")
-
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
-
-    src_path = IMAGES_DIR / record["filename"]
-    if not src_path.exists():
-        raise HTTPException(404, "Image file not found on disk")
-
-    img = Image.open(str(src_path)).convert("RGB")
-    w, h = img.size
-    total_frames = int(duration * fps)
-    frames = []
-
-    for i in range(total_frames):
-        t = i / max(total_frames - 1, 1)
-
-        if effect == "zoom":
-            scale = 1.0 + 0.3 * t
-            cw, ch = int(w / scale), int(h / scale)
-            left = (w - cw) // 2
-            top = (h - ch) // 2
-            frame = img.crop((left, top, left + cw, top + ch)).resize((w, h), Image.LANCZOS)
-
-        elif effect == "pan":
-            offset = int(0.2 * w * t)
-            frame = img.crop((offset, 0, w - int(0.2 * w) + offset, h)).resize((w, h), Image.LANCZOS)
-
-        elif effect == "rotate":
-            angle = -5 + 10 * t
-            frame = img.rotate(angle, resample=Image.BICUBIC, expand=False, fillcolor=(0, 0, 0))
-
-        elif effect == "pulse":
-            import math
-            scale = 1.0 + 0.1 * math.sin(t * math.pi * 2)
-            cw, ch = int(w / scale), int(h / scale)
-            left = (w - cw) // 2
-            top = (h - ch) // 2
-            frame = img.crop((left, top, left + cw, top + ch)).resize((w, h), Image.LANCZOS)
-
-        elif effect == "fade":
-            enhancer = ImageEnhance.Brightness(img)
-            frame = enhancer.enhance(t)
-
-        else:
-            frame = img.copy()
-
-        # Resize to max 512px for GIF
-        max_dim = 512
-        if w > max_dim or h > max_dim:
-            ratio = max_dim / max(w, h)
-            frame = frame.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
-
-        frames.append(frame)
-
-    gif_filename = f"{image_id}.gif"
-    gif_path = IMAGES_DIR / gif_filename
-
-    frame_duration_ms = int(1000 / fps)
-    frames[0].save(
-        str(gif_path),
-        save_all=True,
-        append_images=frames[1:],
-        duration=frame_duration_ms,
-        loop=0,
-        optimize=True,
-    )
-
-    return FileResponse(
-        str(gif_path),
-        media_type="image/gif",
-        filename=gif_filename,
-        headers={"Content-Disposition": f'attachment; filename="{gif_filename}"'},
-    )
