@@ -376,7 +376,7 @@ export default function Home() {
           } else if (status.status === "failed") {
             clearInterval(pollInterval);
             videoPollRef.current = null;
-            setError(status.error || "Video generation failed");
+            setError(typeof status.error === "string" ? status.error : status.error?.message || "Video generation failed");
             setVideoLoading(false);
           }
         } catch {
@@ -415,7 +415,7 @@ export default function Home() {
           } else if (status.status === "failed") {
             clearInterval(pollInterval);
             animatePollRef.current = null;
-            setError(status.error || "Animation failed");
+            setError(typeof status.error === "string" ? status.error : status.error?.message || "Animation failed");
             setAnimating(false);
           }
         } catch {

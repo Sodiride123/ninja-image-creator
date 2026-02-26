@@ -963,7 +963,11 @@ async def video_status(video_id: str):
             record["filename"] = filename
 
         elif record["status"] == "failed":
-            record["error"] = info.get("error", "Unknown error")
+            raw_error = info.get("error", "Unknown error")
+            if isinstance(raw_error, dict):
+                record["error"] = raw_error.get("message", str(raw_error))
+            else:
+                record["error"] = str(raw_error) if raw_error else "Unknown error"
 
         save_videos_db(db)
     except Exception as e:

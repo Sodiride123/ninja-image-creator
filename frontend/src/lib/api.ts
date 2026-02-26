@@ -201,7 +201,7 @@ export interface VideoRecord {
   status: string;
   progress: number;
   filename: string | null;
-  error?: string;
+  error?: string | { code?: string; message?: string };
   created_at: string;
 }
 
