@@ -841,6 +841,62 @@ export default function Home() {
     setShareOpen(false);
   };
 
+  const handleDownload = async (imageId: string, format: string = "png") => {
+    try {
+      // Fetch the blob from the download URL
+      const url = getDownloadUrl(imageId, format);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Create temporary link and trigger download
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `image-${imageId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+      setToast("Download started!");
+      setTimeout(() => setToast(""), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Download failed");
+    }
+  };
+
+  const handleVideoDownload = async (videoId: string) => {
+    try {
+      // Fetch the video blob
+      const url = getVideoUrl(videoId);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Video download failed");
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Create temporary link and trigger download
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `video-${videoId}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+      setToast("Download started!");
+      setTimeout(() => setToast(""), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Video download failed");
+    }
+  };
+
   // Social template selection
   const handleTemplateSelect = (tmpl: typeof SOCIAL_TEMPLATES[0]) => {
     setSelectedTemplate(tmpl.id);
@@ -1327,13 +1383,12 @@ export default function Home() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <a
-                    href={getVideoUrl(videoResult.id)}
-                    download={`video-${videoResult.id}.mp4`}
+                  <button
+                    onClick={() => handleVideoDownload(videoResult.id)}
                     className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
                   >
                     Download MP4
-                  </a>
+                  </button>
                   <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
                     Start fresh
                   </button>
@@ -1371,13 +1426,12 @@ export default function Home() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <a
-                    href={getVideoUrl(animateResult.id)}
-                    download={`animated-${animateResult.id}.mp4`}
+                  <button
+                    onClick={() => handleVideoDownload(animateResult.id)}
                     className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
                   >
                     Download MP4
-                  </a>
+                  </button>
                   <button onClick={() => { setAnimateResult(null); setAnimateOpen(false); }} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
                     Back to image
                   </button>
@@ -1469,9 +1523,9 @@ export default function Home() {
 
                   {/* Download button */}
                   {!inpaintMode && (
-                    <a href={getDownloadUrl(result.id)} className="absolute top-3 right-3 px-3 py-2 bg-black/50 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[8px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity hover:bg-black/70">
+                    <button onClick={() => handleDownload(result.id)} className="absolute top-3 right-3 px-3 py-2 bg-black/50 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[8px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity hover:bg-black/70">
                       ⬇ Download
-                    </a>
+                    </button>
                   )}
 
                   {/* Resolution badge */}
@@ -1576,15 +1630,15 @@ export default function Home() {
                           <button onClick={handleCopyLink} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             📋 Copy image link
                           </button>
-                          <a href={getDownloadUrl(result.id, "png")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          <button onClick={() => handleDownload(result.id, "png")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             📄 Download PNG
-                          </a>
-                          <a href={getDownloadUrl(result.id, "jpeg")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          </button>
+                          <button onClick={() => handleDownload(result.id, "jpeg")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             📸 Download JPEG
-                          </a>
-                          <a href={getDownloadUrl(result.id, "webp")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          </button>
+                          <button onClick={() => handleDownload(result.id, "webp")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             🌐 Download WebP
-                          </a>
+                          </button>
                           <button onClick={handleExportSvg} disabled={svgExporting} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors disabled:opacity-50">
                             {svgExporting ? "⏳ Exporting..." : "🔷 Download SVG"}
                           </button>
