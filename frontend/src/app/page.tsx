@@ -252,13 +252,15 @@ export default function Home() {
     clearResults();
 
     try {
+      const text_overlay = textOverlayOpen && overlayText ? { text: overlayText, font_hint: overlayFont, placement: overlayPlacement } as TextOverlay : undefined;
+
       if (referenceFile) {
-        const image = await generateFromImage(prompt, referenceFile, style, size);
+        const image = await generateFromImage(prompt, referenceFile, style, size, text_overlay);
         setResult(image);
       } else {
         const req_params = {
           prompt, style, size,
-          text_overlay: textOverlayOpen && overlayText ? { text: overlayText, font_hint: overlayFont, placement: overlayPlacement } as TextOverlay : undefined,
+          text_overlay,
         };
         const image = (await generateImage(req_params)) as ImageRecord;
         setResult(image);

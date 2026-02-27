@@ -446,33 +446,50 @@ async def get_image(image_id: str):
 
 @app.get("/api/images/{image_id}/download")
 async def download_image(image_id: str, format: str = Query(default="png")):
-    db = load_db()
-    record = next((r for r in db if r["id"] == image_id), None)
-    if not record:
-        raise HTTPException(404, "Image not found")
+    try:
+        db = load_db()
+        record = next((r for r in db if r["id"] == image_id), None)
+        if not record:
+            raise HTTPException(404, "Image not found in database")
 
-    file_path = IMAGES_DIR / record["filename"]
-    if not file_path.exists():
-        raise HTTPException(404, "Image file not found")
+        file_path = IMAGES_DIR / record["filename"]
+        if not file_path.exists():
+            print(f"[ERROR] Download failed: File not found at {file_path}")
+            raise HTTPException(404, f"Image file not found on server: {record['filename']}")
 
-    safe_name = re.sub(r'[^\w\s-]', '', record["prompt"][:50]).strip().replace(' ', '_') or image_id
+        # Generate safe filename
+        safe_name = re.sub(r'[^\w\s-]', '', record.get("prompt", "")[:50]).strip().replace(' ', '_') or image_id
 
-    if format in ("jpeg", "jpg"):
-        img = Image.open(file_path).convert("RGB")
-        buf = BytesIO()
-        img.save(buf, format="JPEG", quality=90)
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/jpeg",
-                                 headers={"Content-Disposition": f'attachment; filename="{safe_name}.jpg"'})
-    elif format == "webp":
-        img = Image.open(file_path)
-        buf = BytesIO()
-        img.save(buf, format="WEBP", quality=90)
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/webp",
-                                 headers={"Content-Disposition": f'attachment; filename="{safe_name}.webp"'})
-    else:
-        return FileResponse(path=str(file_path), filename=f"{safe_name}.png", media_type="image/png")
+        if format in ("jpeg", "jpg"):
+            try:
+                img = Image.open(file_path).convert("RGB")
+                buf = BytesIO()
+                img.save(buf, format="JPEG", quality=90)
+                buf.seek(0)
+                return StreamingResponse(buf, media_type="image/jpeg",
+                                         headers={"Content-Disposition": f'attachment; filename="{safe_name}.jpg"'})
+            except Exception as e:
+                print(f"[ERROR] JPEG conversion failed for {image_id}: {e}")
+                raise HTTPException(500, f"Failed to convert image to JPEG: {str(e)}")
+        elif format == "webp":
+            try:
+                img = Image.open(file_path)
+                buf = BytesIO()
+                img.save(buf, format="WEBP", quality=90)
+                buf.seek(0)
+                return StreamingResponse(buf, media_type="image/webp",
+                                         headers={"Content-Disposition": f'attachment; filename="{safe_name}.webp"'})
+            except Exception as e:
+                print(f"[ERROR] WebP conversion failed for {image_id}: {e}")
+                raise HTTPException(500, f"Failed to convert image to WebP: {str(e)}")
+        else:
+            # PNG format - direct file response
+            return FileResponse(path=str(file_path), filename=f"{safe_name}.png", media_type="image/png")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Unexpected download error for {image_id}: {e}")
+        raise HTTPException(500, f"Download failed: {str(e)}")
 
 
 @app.get("/api/images/{image_id}/file")
@@ -602,6 +619,7 @@ async def generate_from_image(
     style: str = Form(default="none"),
     size: str = Form(default="1024x1024"),
     reference: UploadFile = File(...),
+    text_overlay: str = Form(default=None),  # JSON string of text overlay config
 ):
     if size not in VALID_SIZES:
         raise HTTPException(400, f"Invalid size. Must be one of: {VALID_SIZES}")
@@ -629,6 +647,15 @@ async def generate_from_image(
     # Build prompt with style
     style_suffix = STYLE_SUFFIXES.get(style, "")
 
+    # Parse text_overlay if provided
+    text_overlay_dict = None
+    if text_overlay:
+        try:
+            import json
+            text_overlay_dict = json.loads(text_overlay)
+        except Exception:
+            pass
+
     # Use Claude to analyze the reference image and build a rich prompt
     # that incorporates the visual details from the reference
     try:
@@ -647,6 +674,9 @@ async def generate_from_image(
         )
     except Exception:
         generation_prompt = prompt + style_suffix
+
+    # Apply text overlay to the generation prompt
+    generation_prompt = _apply_text_overlay(generation_prompt, text_overlay_dict)
 
     image_id = str(uuid.uuid4())
     filename = f"{image_id}.png"
@@ -692,6 +722,7 @@ async def generate_from_image(
         "size": size,
         "filename": filename,
         "reference_filename": ref_filename,
+        "text_overlay": text_overlay_dict,
         "created_at": datetime.utcnow().isoformat(),
     }
     db = load_db()

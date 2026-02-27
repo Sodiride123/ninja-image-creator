@@ -91,13 +91,15 @@ export async function generateFromImage(
   prompt: string,
   file: File,
   style?: string,
-  size?: string
+  size?: string,
+  textOverlay?: TextOverlay
 ): Promise<ImageRecord> {
   const formData = new FormData();
   formData.append("prompt", prompt);
   formData.append("reference", file);
   if (style) formData.append("style", style);
   if (size) formData.append("size", size);
+  if (textOverlay) formData.append("text_overlay", JSON.stringify(textOverlay));
 
   const res = await fetch(`${API_URL}/api/generate-from-image`, {
     method: "POST",
