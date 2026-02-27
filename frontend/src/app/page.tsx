@@ -21,7 +21,6 @@ import {
   getPromptSuggestions,
   clearPromptHistory,
   watermarkImage,
-  exportSvg,
   replaceObject,
   detectScript,
   type ImageRecord,
@@ -146,7 +145,6 @@ export default function Home() {
 
   // Share
   const [shareOpen, setShareOpen] = useState(false);
-  const [toast, setToast] = useState("");
 
   // Video generation
   const [videoMode, setVideoMode] = useState(false);
@@ -210,8 +208,7 @@ export default function Home() {
   const [overlayFont, setOverlayFont] = useState("bold");
   const [overlayPlacement, setOverlayPlacement] = useState("center");
 
-  // Sprint 8: SVG export, object replacement
-  const [svgExporting, setSvgExporting] = useState(false);
+  // Sprint 8: object replacement
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState("");
   const [replaceWith, setReplaceWith] = useState("");
@@ -291,24 +288,6 @@ export default function Home() {
   };
 
   // Sprint 8 handlers
-  const handleExportSvg = async () => {
-    if (!result) return;
-    setSvgExporting(true);
-    try {
-      const blob = await exportSvg(result.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${result.id}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "SVG export failed");
-    } finally {
-      setSvgExporting(false);
-    }
-  };
-
   const handleReplaceObject = async () => {
     if (!result || !replaceTarget.trim() || !replaceWith.trim()) return;
     setReplaceLoading(true);
@@ -832,71 +811,6 @@ export default function Home() {
     setPan({ x: 0, y: 0 });
   };
 
-  // Share — copy link
-  const handleCopyLink = () => {
-    if (!result) return;
-    navigator.clipboard.writeText(getImageUrl(result.id));
-    setToast("Link copied!");
-    setTimeout(() => setToast(""), 2000);
-    setShareOpen(false);
-  };
-
-  const handleDownload = async (imageId: string, format: string = "png") => {
-    try {
-      // Fetch the blob from the download URL
-      const url = getDownloadUrl(imageId, format);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Download failed");
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // Create temporary link and trigger download
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `image-${imageId}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // Clean up the blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-      setToast("Download started!");
-      setTimeout(() => setToast(""), 2000);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Download failed");
-    }
-  };
-
-  const handleVideoDownload = async (videoId: string) => {
-    try {
-      // Fetch the video blob
-      const url = getVideoUrl(videoId);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Video download failed");
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // Create temporary link and trigger download
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `video-${videoId}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // Clean up the blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-      setToast("Download started!");
-      setTimeout(() => setToast(""), 2000);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Video download failed");
-    }
-  };
-
   // Social template selection
   const handleTemplateSelect = (tmpl: typeof SOCIAL_TEMPLATES[0]) => {
     setSelectedTemplate(tmpl.id);
@@ -907,13 +821,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500 text-[var(--foreground)] px-4 py-2 rounded-[8px] text-sm shadow-lg animate-pulse">
-          {toast}
-        </div>
-      )}
-
       {/* Header */}
       <header className="border-b border-[var(--border)] px-4 sm:px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -1383,12 +1290,13 @@ export default function Home() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleVideoDownload(videoResult.id)}
+                  <a
+                    href={getVideoUrl(videoResult.id)}
+                    download={`video-${videoResult.id}.mp4`}
                     className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
                   >
                     Download MP4
-                  </button>
+                  </a>
                   <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
                     Start fresh
                   </button>
@@ -1426,12 +1334,13 @@ export default function Home() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleVideoDownload(animateResult.id)}
+                  <a
+                    href={getVideoUrl(animateResult.id)}
+                    download={`animated-${animateResult.id}.mp4`}
                     className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
                   >
                     Download MP4
-                  </button>
+                  </a>
                   <button onClick={() => { setAnimateResult(null); setAnimateOpen(false); }} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
                     Back to image
                   </button>
@@ -1519,13 +1428,6 @@ export default function Home() {
                         +
                       </button>
                     </div>
-                  )}
-
-                  {/* Download button */}
-                  {!inpaintMode && (
-                    <button onClick={() => handleDownload(result.id)} className="absolute top-3 right-3 px-3 py-2 bg-black/50 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[8px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity hover:bg-black/70">
-                      ⬇ Download
-                    </button>
                   )}
 
                   {/* Resolution badge */}
@@ -1622,26 +1524,18 @@ export default function Home() {
                       <button
                         onClick={() => setShareOpen(!shareOpen)}
                         className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all"
+                        title="Download works in browser, not in preview"
                       >
-                        🔗 Share
+                        ⬇ Download (open in browser)
                       </button>
                       {shareOpen && (
                         <div className="absolute top-full mt-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3 shadow-xl z-20 min-w-[180px] space-y-2">
-                          <button onClick={handleCopyLink} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
-                            📋 Copy image link
-                          </button>
-                          <button onClick={() => handleDownload(result.id, "png")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          <a href={getDownloadUrl(result.id, "png")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             📄 Download PNG
-                          </button>
-                          <button onClick={() => handleDownload(result.id, "jpeg")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          </a>
+                          <a href={getDownloadUrl(result.id, "jpeg")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
                             📸 Download JPEG
-                          </button>
-                          <button onClick={() => handleDownload(result.id, "webp")} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
-                            🌐 Download WebP
-                          </button>
-                          <button onClick={handleExportSvg} disabled={svgExporting} className="w-full text-left px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors disabled:opacity-50">
-                            {svgExporting ? "⏳ Exporting..." : "🔷 Download SVG"}
-                          </button>
+                          </a>
                         </div>
                       )}
                     </div>
