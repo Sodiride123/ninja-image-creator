@@ -165,14 +165,14 @@ export default function GalleryPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b border-[var(--border)] px-4 sm:px-6 py-4">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] px-4 sm:px-6 py-4 backdrop-blur-xl bg-[var(--background)]/80">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Image Creator
           </h1>
           <Link
             href="/"
-            className="text-sm bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white px-4 py-2 rounded-[8px] transition-colors"
+            className="text-sm btn-gradient text-white px-4 py-2 rounded-xl"
           >
             + New Image
           </Link>
@@ -181,12 +181,12 @@ export default function GalleryPage() {
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
         {/* Tab Switcher */}
-        <div className="flex gap-1 mb-6 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-1 w-fit">
+        <div className="flex gap-1 mb-6 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl p-1 w-fit">
           <button
             onClick={() => { setActiveTab("images"); setSelectedCollection(null); }}
-            className={`px-5 py-2 rounded-[8px] text-sm font-medium transition-all ${
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === "images"
-                ? "bg-[var(--primary)] text-white shadow-sm"
+                ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
                 : "text-[var(--muted)] hover:text-white"
             }`}
           >
@@ -194,9 +194,9 @@ export default function GalleryPage() {
           </button>
           <button
             onClick={() => { setActiveTab("videos"); setSelectedCollection(null); setSelected(null); }}
-            className={`px-5 py-2 rounded-[8px] text-sm font-medium transition-all ${
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === "videos"
-                ? "bg-[var(--primary)] text-white shadow-sm"
+                ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
                 : "text-[var(--muted)] hover:text-white"
             }`}
           >
@@ -213,7 +213,7 @@ export default function GalleryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search prompts..."
-              className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] h-10 pl-9 pr-8 text-sm text-white focus:outline-none focus:border-[var(--primary)] transition-colors"
+              className="w-full bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl h-10 pl-9 pr-8 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]/50 focus:shadow-[0_0_20px_var(--glow)] transition-all backdrop-blur-sm"
             />
             {search && (
               <button
@@ -227,20 +227,20 @@ export default function GalleryPage() {
           <div className="flex gap-2">
             <button
               onClick={() => { setFavoritesOnly(false); setPage(1); }}
-              className={`px-4 py-2 rounded-[8px] text-sm transition-all ${
+              className={`px-4 py-2 rounded-xl text-sm transition-all ${
                 !favoritesOnly
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
+                  ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                  : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
               }`}
             >
               All
             </button>
             <button
               onClick={() => { setFavoritesOnly(true); setPage(1); }}
-              className={`px-4 py-2 rounded-[8px] text-sm transition-all ${
+              className={`px-4 py-2 rounded-xl text-sm transition-all ${
                 favoritesOnly
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
+                  ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                  : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
               }`}
             >
               ♥ Favorites
@@ -252,10 +252,10 @@ export default function GalleryPage() {
         <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
           <button
             onClick={() => setSelectedCollection(null)}
-            className={`px-3 py-1.5 rounded-[8px] text-xs whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${
               !selectedCollection
-                ? "bg-[var(--primary)] text-white"
-                : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
+                ? "bg-[var(--primary)] text-white shadow-sm shadow-[var(--glow)]"
+                : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
             }`}
           >
             All Images
@@ -264,10 +264,10 @@ export default function GalleryPage() {
             <button
               key={c.id}
               onClick={() => handleViewCollection(c)}
-              className={`px-3 py-1.5 rounded-[8px] text-xs whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${
                 selectedCollection?.id === c.id
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
+                  ? "bg-[var(--primary)] text-white shadow-sm shadow-[var(--glow)]"
+                  : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:text-white"
               }`}
             >
               📁 {c.name} ({c.image_count})
@@ -279,7 +279,7 @@ export default function GalleryPage() {
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
                 placeholder="Collection name"
-                className="bg-[var(--surface)] border border-[var(--border)] rounded-[6px] h-7 px-2 text-xs text-white focus:outline-none focus:border-[var(--primary)] w-32"
+                className="bg-[var(--surface-glass)] border border-[var(--border)] rounded-lg h-7 px-2 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]/50 w-32"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateCollection(); if (e.key === "Escape") setShowNewCollection(false); }}
               />
@@ -289,7 +289,7 @@ export default function GalleryPage() {
           ) : (
             <button
               onClick={() => setShowNewCollection(true)}
-              className="px-3 py-1.5 rounded-[8px] text-xs bg-[var(--surface)] border border-dashed border-[var(--border)] text-[var(--muted)] hover:text-white hover:border-[var(--primary)] transition-all whitespace-nowrap"
+              className="px-3 py-1.5 rounded-lg text-xs bg-[var(--surface-glass)] border border-dashed border-[var(--border)] text-[var(--muted)] hover:text-white hover:border-[var(--primary)]/40 transition-all whitespace-nowrap"
             >
               + New Collection
             </button>
@@ -315,7 +315,7 @@ export default function GalleryPage() {
                 <button
                   key={img.id}
                   onClick={() => setSelected(img)}
-                  className="group relative aspect-square rounded-[12px] overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors"
+                  className="group relative aspect-square rounded-2xl overflow-hidden border border-[var(--border)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_30px_var(--glow)] transition-all"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={getImageUrl(img.id)} alt={img.prompt} className="w-full h-full object-cover" />
@@ -331,7 +331,7 @@ export default function GalleryPage() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="aspect-square bg-[var(--surface)] rounded-xl animate-pulse border border-[var(--border)]"
+                className="aspect-square bg-[var(--surface-glass)] rounded-2xl animate-pulse border border-[var(--border)]"
               />
             ))}
           </div>
@@ -351,7 +351,7 @@ export default function GalleryPage() {
             {!searchDebounced && !favoritesOnly && (
               <Link
                 href="/"
-                className="inline-block px-6 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium rounded-[8px] transition-colors"
+                className="inline-block px-6 py-3 btn-gradient text-white font-medium rounded-xl"
               >
                 Create Your First Image
               </Link>
@@ -364,7 +364,7 @@ export default function GalleryPage() {
                 <div
                   key={img.id}
                   onClick={() => setSelected(img)}
-                  className="group relative aspect-square rounded-[12px] overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors cursor-pointer"
+                  className="group relative aspect-square rounded-2xl overflow-hidden border border-[var(--border)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_30px_var(--glow)] transition-all cursor-pointer"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -394,7 +394,7 @@ export default function GalleryPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm disabled:opacity-40"
+                  className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm disabled:opacity-40 hover:border-[var(--primary)]/30 transition-all"
                 >
                   Previous
                 </button>
@@ -404,7 +404,7 @@ export default function GalleryPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm disabled:opacity-40"
+                  className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm disabled:opacity-40 hover:border-[var(--primary)]/30 transition-all"
                 >
                   Next
                 </button>
@@ -426,7 +426,7 @@ export default function GalleryPage() {
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div
                     key={i}
-                    className="aspect-video bg-[var(--surface)] rounded-xl animate-pulse border border-[var(--border)]"
+                    className="aspect-video bg-[var(--surface-glass)] rounded-2xl animate-pulse border border-[var(--border)]"
                   />
                 ))}
               </div>
@@ -437,7 +437,7 @@ export default function GalleryPage() {
                 <p className="text-[var(--muted)] mb-6">Generate your first video from the creation page</p>
                 <Link
                   href="/"
-                  className="inline-block px-6 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium rounded-[8px] transition-colors"
+                  className="inline-block px-6 py-3 btn-gradient text-white font-medium rounded-xl"
                 >
                   Create a Video
                 </Link>
@@ -449,7 +449,7 @@ export default function GalleryPage() {
                     <button
                       key={video.id}
                       onClick={() => video.status === "completed" && setSelectedVideo(video)}
-                      className="group relative aspect-video rounded-[12px] overflow-hidden border border-[var(--border)] hover:border-[var(--primary)] transition-colors bg-[var(--surface)]"
+                      className="group relative aspect-video rounded-2xl overflow-hidden border border-[var(--border)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_30px_var(--glow)] transition-all bg-[var(--surface-glass)]"
                     >
                       {video.status === "completed" && video.filename ? (
                         <>
@@ -490,7 +490,7 @@ export default function GalleryPage() {
                     <button
                       onClick={() => setVideoPage((p) => Math.max(1, p - 1))}
                       disabled={videoPage === 1}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm disabled:opacity-40"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm disabled:opacity-40 hover:border-[var(--primary)]/30 transition-all"
                     >
                       Previous
                     </button>
@@ -500,7 +500,7 @@ export default function GalleryPage() {
                     <button
                       onClick={() => setVideoPage((p) => Math.min(videoTotalPages, p + 1))}
                       disabled={videoPage === videoTotalPages}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm disabled:opacity-40"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm disabled:opacity-40 hover:border-[var(--primary)]/30 transition-all"
                     >
                       Next
                     </button>
@@ -515,11 +515,11 @@ export default function GalleryPage() {
       {/* Lightbox Modal */}
       {selected && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setSelected(null)}
         >
           <div
-            className="max-w-3xl w-full bg-[var(--surface)] rounded-[12px] overflow-hidden border border-[var(--border)]"
+            className="max-w-3xl w-full bg-[var(--surface)] rounded-2xl overflow-hidden border border-[var(--border)] shadow-2xl shadow-black/30"
             onClick={(e) => e.stopPropagation()}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -556,25 +556,25 @@ export default function GalleryPage() {
               <div className="flex gap-3">
                 <a
                   href={getDownloadUrl(selected.id, "png")}
-                  className="flex-1 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-center rounded-lg text-sm transition-colors"
+                  className="flex-1 py-2 btn-gradient text-white text-center rounded-xl text-sm"
                 >
                   Download PNG
                 </a>
                 <a
                   href={getDownloadUrl(selected.id, "jpeg")}
-                  className="py-2 px-3 bg-[var(--border)] hover:bg-gray-600 text-white text-center rounded-lg text-sm transition-colors"
+                  className="py-2 px-3 bg-[var(--surface-glass)] border border-[var(--border)] hover:border-[var(--primary)]/30 text-white text-center rounded-xl text-sm transition-all"
                 >
                   JPEG
                 </a>
                 <a
                   href={getDownloadUrl(selected.id, "webp")}
-                  className="py-2 px-3 bg-[var(--border)] hover:bg-gray-600 text-white text-center rounded-lg text-sm transition-colors"
+                  className="py-2 px-3 bg-[var(--surface-glass)] border border-[var(--border)] hover:border-[var(--primary)]/30 text-white text-center rounded-xl text-sm transition-all"
                 >
                   WebP
                 </a>
                 <button
                   onClick={() => setSelected(null)}
-                  className="py-2 px-4 bg-[var(--border)] hover:bg-gray-600 text-white text-center rounded-lg text-sm transition-colors"
+                  className="py-2 px-4 bg-[var(--surface-glass)] border border-[var(--border)] hover:border-[var(--primary)]/30 text-white text-center rounded-xl text-sm transition-all"
                 >
                   Close
                 </button>
@@ -589,12 +589,12 @@ export default function GalleryPage() {
                     📁 Add to collection
                   </button>
                   {addToCollectionOpen === selected.id && (
-                    <div className="absolute bottom-full mb-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] p-2 shadow-xl z-30 min-w-[160px] space-y-1">
+                    <div className="absolute bottom-full mb-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 shadow-2xl shadow-black/30 z-30 min-w-[160px] space-y-1 backdrop-blur-xl">
                       {collections.map((c) => (
                         <button
                           key={c.id}
                           onClick={() => handleAddToCollection(c.id, selected.id)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white hover:bg-[#334155] rounded-[6px] transition-colors"
+                          className="w-full text-left px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white hover:bg-[var(--surface-glass)] rounded-lg transition-colors"
                         >
                           📁 {c.name}
                         </button>
@@ -610,11 +610,11 @@ export default function GalleryPage() {
       {/* Video Lightbox Modal */}
       {selectedVideo && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setSelectedVideo(null)}
         >
           <div
-            className="max-w-3xl w-full bg-[var(--surface)] rounded-[12px] overflow-hidden border border-[var(--border)]"
+            className="max-w-3xl w-full bg-[var(--surface)] rounded-2xl overflow-hidden border border-[var(--border)] shadow-2xl shadow-black/30"
             onClick={(e) => e.stopPropagation()}
           >
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -638,20 +638,20 @@ export default function GalleryPage() {
                 <a
                   href={getVideoUrl(selectedVideo.id)}
                   download
-                  className="flex-1 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-center rounded-lg text-sm transition-colors"
+                  className="flex-1 py-2 btn-gradient text-white text-center rounded-xl text-sm"
                 >
                   Download MP4
                 </a>
                 <button
                   onClick={() => handleDeleteVideo(selectedVideo.id)}
                   disabled={deletingVideoId === selectedVideo.id}
-                  className="py-2 px-4 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition-colors disabled:opacity-50"
+                  className="py-2 px-4 bg-red-600/10 border border-red-500/20 hover:bg-red-600/20 text-red-400 rounded-xl text-sm transition-all disabled:opacity-50"
                 >
                   {deletingVideoId === selectedVideo.id ? "Deleting..." : "Delete"}
                 </button>
                 <button
                   onClick={() => setSelectedVideo(null)}
-                  className="py-2 px-4 bg-[var(--border)] hover:bg-gray-600 text-white text-center rounded-lg text-sm transition-colors"
+                  className="py-2 px-4 bg-[var(--surface-glass)] border border-[var(--border)] hover:border-[var(--primary)]/30 text-white text-center rounded-xl text-sm transition-all"
                 >
                   Close
                 </button>
@@ -666,12 +666,12 @@ export default function GalleryPage() {
                     📁 Add to collection
                   </button>
                   {addVideoToCollectionOpen === selectedVideo.id && (
-                    <div className="absolute bottom-full mb-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] p-2 shadow-xl z-30 min-w-[160px] space-y-1">
+                    <div className="absolute bottom-full mb-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 shadow-2xl shadow-black/30 z-30 min-w-[160px] space-y-1 backdrop-blur-xl">
                       {collections.map((c) => (
                         <button
                           key={c.id}
                           onClick={() => handleAddVideoToCollection(c.id, selectedVideo.id)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white hover:bg-[#334155] rounded-[6px] transition-colors"
+                          className="w-full text-left px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white hover:bg-[var(--surface-glass)] rounded-lg transition-colors"
                         >
                           📁 {c.name}
                         </button>

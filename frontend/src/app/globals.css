@@ -2,23 +2,27 @@
 
 :root,
 [data-theme="dark"] {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
-  --surface: #1E293B;
-  --primary: #3B82F6;
-  --primary-hover: #2563EB;
-  --border: #334155;
-  --muted: #94A3B8;
+  --background: #09090B;
+  --foreground: #FAFAFA;
+  --surface: #18181B;
+  --surface-glass: rgba(255, 255, 255, 0.04);
+  --primary: #6366F1;
+  --primary-hover: #4F46E5;
+  --border: rgba(255, 255, 255, 0.08);
+  --muted: #A1A1AA;
+  --glow: rgba(99, 102, 241, 0.15);
 }
 
 [data-theme="light"] {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  --background: #FAFAFA;
+  --foreground: #09090B;
   --surface: #FFFFFF;
-  --primary: #2563EB;
-  --primary-hover: #1D4ED8;
-  --border: #CBD5E1;
-  --muted: #64748B;
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --border: #E4E4E7;
+  --muted: #71717A;
+  --glow: rgba(79, 70, 229, 0.1);
 }
 
 @theme inline {
@@ -43,11 +47,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--background);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Animations */
@@ -58,4 +65,37 @@ body {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Glass card utility */
+.glass-card {
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+/* Subtle glow for active/selected elements */
+.glow-primary {
+  box-shadow: 0 0 20px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Gradient button */
+.btn-gradient {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  transition: all 0.2s ease;
+}
+.btn-gradient:hover {
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+}
+.btn-gradient:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }

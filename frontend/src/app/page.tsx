@@ -822,22 +822,22 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b border-[var(--border)] px-4 sm:px-6 py-4">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] px-4 sm:px-6 py-4 backdrop-blur-xl bg-[var(--background)]/80">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Image Creator
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-8 h-8 rounded-full bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-sm hover:border-[var(--primary)] transition-colors"
+              className="w-9 h-9 rounded-xl bg-[var(--surface-glass)] border border-[var(--border)] flex items-center justify-center text-sm hover:border-[var(--primary)] hover:shadow-[0_0_15px_var(--glow)] transition-all"
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
               {theme === "dark" ? "☀️" : "🌙"}
             </button>
             <Link
               href="/gallery"
-              className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+              className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-3 py-1.5 rounded-lg hover:bg-[var(--surface-glass)]"
             >
               Gallery →
             </Link>
@@ -851,23 +851,23 @@ export default function Home() {
           {/* Left Panel (40%) — Controls */}
           <div className="lg:col-span-2 space-y-6">
             {/* Image / Video Mode Toggle */}
-            <div className="flex gap-2">
+            <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface-glass)] border border-[var(--border)]">
               <button
                 onClick={() => setVideoMode(false)}
-                className={`flex-1 py-2 rounded-[8px] text-sm font-medium transition-all ${
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   !videoMode
-                    ? "bg-[var(--primary)] text-[var(--foreground)]"
-                    : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                    ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
                 Image
               </button>
               <button
                 onClick={() => setVideoMode(true)}
-                className={`flex-1 py-2 rounded-[8px] text-sm font-medium transition-all ${
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   videoMode
-                    ? "bg-[var(--primary)] text-[var(--foreground)]"
-                    : "bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                    ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
                 Video
@@ -880,7 +880,7 @@ export default function Home() {
                 Reference Image (optional)
               </label>
               {referencePreview ? (
-                <div className="relative rounded-[12px] overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+                <div className="relative rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface-glass)] backdrop-blur-sm">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={referencePreview}
@@ -889,7 +889,7 @@ export default function Home() {
                   />
                   <button
                     onClick={removeReference}
-                    className="absolute top-2 right-2 w-6 h-6 bg-black/60 backdrop-blur-sm rounded-full text-[var(--foreground)] text-xs flex items-center justify-center hover:bg-black/80"
+                    className="absolute top-2 right-2 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-lg text-[var(--foreground)] text-xs flex items-center justify-center hover:bg-black/80 transition-colors"
                   >
                     ✕
                   </button>
@@ -897,10 +897,10 @@ export default function Home() {
                 </div>
               ) : (
                 <div
-                  className={`border-2 border-dashed rounded-[12px] min-h-[100px] lg:min-h-[120px] bg-[var(--surface)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
+                  className={`border border-dashed rounded-xl min-h-[100px] lg:min-h-[120px] bg-[var(--surface-glass)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
                     dragActive
-                      ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                      : "border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--primary)]/5"
+                      ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-[0_0_30px_var(--glow)]"
+                      : "border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--primary)]/5"
                   }`}
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={(e) => {
@@ -910,7 +910,7 @@ export default function Home() {
                   onDragLeave={() => setDragActive(false)}
                   onDrop={handleDrop}
                 >
-                  <span className="text-2xl opacity-50">☁️</span>
+                  <span className="text-2xl opacity-40">☁️</span>
                   <p className="text-sm text-[var(--muted)]">Drag & drop a reference image</p>
                   <p className="text-xs text-[var(--primary)]">or click to browse</p>
                 </div>
@@ -939,14 +939,14 @@ export default function Home() {
                   setPromptDropdownIndex(-1);
                 }}
                 placeholder={videoMode ? "Describe the video you want to create..." : "Describe the image you want to create..."}
-                className="w-full min-h-[120px] bg-[var(--surface)] border border-[var(--border)] rounded-[6px] p-4 text-[var(--foreground)] placeholder-gray-500 resize-y focus:outline-none focus:border-[var(--primary)] transition-colors"
+                className="w-full min-h-[120px] bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl p-4 text-[var(--foreground)] placeholder-[var(--muted)]/50 resize-y focus:outline-none focus:border-[var(--primary)]/50 focus:shadow-[0_0_20px_var(--glow)] transition-all backdrop-blur-sm"
                 onFocus={handlePromptFocus}
                 onBlur={handlePromptBlur}
                 onKeyDown={handlePromptKeyDown}
               />
               {/* Prompt History / Suggestions Dropdown */}
               {showPromptDropdown && (
-                <div ref={promptDropdownRef} className="absolute left-0 right-0 top-full mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] shadow-xl z-30 max-h-[200px] overflow-y-auto">
+                <div ref={promptDropdownRef} className="absolute left-0 right-0 top-full mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl shadow-black/30 z-30 max-h-[200px] overflow-y-auto backdrop-blur-xl">
                   {(prompt.trim().length >= 2 ? promptSuggestions : promptHistory).length > 0 ? (
                     <>
                       {(prompt.trim().length >= 2 ? promptSuggestions : promptHistory).map((entry, i) => (
@@ -1007,10 +1007,10 @@ export default function Home() {
                       <button
                         key={s.id}
                         onClick={() => setVideoSize(s.id)}
-                        className={`flex-1 py-3 rounded-[8px] text-sm text-center transition-all ${
+                        className={`flex-1 py-3 rounded-xl text-sm text-center transition-all ${
                           videoSize === s.id
-                            ? "border-2 border-[var(--primary)] bg-[var(--surface)] text-[var(--foreground)]"
-                            : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)]"
+                            ? "border border-[var(--primary)]/50 bg-[var(--primary)]/10 text-[var(--foreground)] shadow-[0_0_20px_var(--glow)]"
+                            : "border border-[var(--border)] bg-[var(--surface-glass)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                         }`}
                       >
                         <div className="font-medium">{s.label}</div>
@@ -1023,23 +1023,23 @@ export default function Home() {
                   <label className="block text-sm font-medium text-[var(--muted)] mb-2">
                     Quality
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface-glass)] border border-[var(--border)]">
                     <button
                       onClick={() => setVideoQuality("standard")}
-                      className={`flex-1 py-2 rounded-[8px] text-sm transition-all ${
+                      className={`flex-1 py-2 rounded-lg text-sm transition-all ${
                         videoQuality === "standard"
-                          ? "bg-[var(--primary)] text-[var(--foreground)]"
-                          : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                          ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                          : "text-[var(--muted)] hover:text-[var(--foreground)]"
                       }`}
                     >
                       Standard
                     </button>
                     <button
                       onClick={() => setVideoQuality("pro")}
-                      className={`flex-1 py-2 rounded-[8px] text-sm transition-all ${
+                      className={`flex-1 py-2 rounded-lg text-sm transition-all ${
                         videoQuality === "pro"
-                          ? "bg-[var(--primary)] text-[var(--foreground)]"
-                          : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                          ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                          : "text-[var(--muted)] hover:text-[var(--foreground)]"
                       }`}
                     >
                       Pro
@@ -1061,8 +1061,8 @@ export default function Home() {
                     onClick={() => setStyle(s.id)}
                     className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all ${
                       style === s.id
-                        ? "bg-[var(--primary)] text-[var(--foreground)]"
-                        : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                        ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                        : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                     }`}
                   >
                     {s.icon} {s.label}
@@ -1081,24 +1081,24 @@ export default function Home() {
                   <button
                     key={s.id}
                     onClick={() => { setSize(s.id); setSelectedTemplate(null); }}
-                    className={`flex-1 py-3 rounded-[8px] text-sm text-center transition-all ${
+                    className={`flex-1 py-3 rounded-xl text-sm text-center transition-all ${
                       size === s.id && !selectedTemplate
-                        ? "border-2 border-[var(--primary)] bg-[var(--surface)] text-[var(--foreground)]"
-                        : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)]"
+                        ? "border border-[var(--primary)]/50 bg-[var(--primary)]/10 text-[var(--foreground)] shadow-[0_0_20px_var(--glow)]"
+                        : "border border-[var(--border)] bg-[var(--surface-glass)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                     }`}
                   >
                     <div className="flex justify-center mb-2">
                       <div
                         style={{ width: s.previewW, height: s.previewH }}
-                        className={`border-2 rounded-[3px] ${
+                        className={`border-2 rounded-[3px] transition-colors ${
                           size === s.id && !selectedTemplate
                             ? "border-[var(--primary)]"
-                            : "border-[var(--muted)] opacity-50"
+                            : "border-[var(--muted)] opacity-40"
                         }`}
                       />
                     </div>
                     <div className="font-medium">{s.label}</div>
-                    <div className="text-xs opacity-70">{s.ratio}</div>
+                    <div className="text-xs opacity-60">{s.ratio}</div>
                   </button>
                 ))}
               </div>
@@ -1114,14 +1114,14 @@ export default function Home() {
                   <button
                     key={t.id}
                     onClick={() => handleTemplateSelect(t)}
-                    className={`px-3 py-2 rounded-[8px] text-xs transition-all ${
+                    className={`px-3 py-2 rounded-lg text-xs transition-all ${
                       selectedTemplate === t.id
-                        ? "bg-[var(--primary)] text-[var(--foreground)]"
-                        : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                        ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--glow)]"
+                        : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                     }`}
                   >
                     {t.icon} {t.label}
-                    <span className="ml-1 opacity-60">{t.dims}</span>
+                    <span className="ml-1 opacity-50">{t.dims}</span>
                   </button>
                 ))}
               </div>
@@ -1139,14 +1139,14 @@ export default function Home() {
                   <span>🔤</span> Add Text {textOverlayOpen ? "▾" : "▸"}
                 </button>
                 {textOverlayOpen && (
-                  <div className="bg-[var(--surface)] rounded-[12px] p-3 space-y-3 border border-[var(--border)]">
+                  <div className="bg-[var(--surface-glass)] rounded-xl p-3 space-y-3 border border-[var(--border)] backdrop-blur-sm">
                     <input
                       type="text"
                       value={overlayText}
                       onChange={(e) => setOverlayText(e.target.value)}
                       placeholder="Text to render in image..."
                       maxLength={200}
-                      className="w-full px-3 py-2 bg-[var(--background)] rounded-[6px] text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)] outline-none"
+                      className="w-full px-3 py-2 bg-[var(--background)]/50 rounded-lg text-sm text-[var(--foreground)] border border-[var(--border)] focus:border-[var(--primary)]/50 focus:shadow-[0_0_15px_var(--glow)] outline-none transition-all"
                       dir={detectedDirection === "rtl" ? "rtl" : "ltr"}
                     />
                     {detectedScript && (
@@ -1166,8 +1166,8 @@ export default function Home() {
                             onClick={() => setOverlayFont(f)}
                             className={`px-2 py-1 rounded-full text-xs capitalize transition-all ${
                               overlayFont === f
-                                ? "bg-[var(--primary)] text-[var(--foreground)]"
-                                : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                                ? "bg-[var(--primary)] text-white shadow-sm shadow-[var(--glow)]"
+                                : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                             }`}
                           >
                             {f}
@@ -1184,8 +1184,8 @@ export default function Home() {
                             onClick={() => setOverlayPlacement(p)}
                             className={`px-3 py-1 rounded-full text-xs capitalize transition-all ${
                               overlayPlacement === p
-                                ? "bg-[var(--primary)] text-[var(--foreground)]"
-                                : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                                ? "bg-[var(--primary)] text-white shadow-sm shadow-[var(--glow)]"
+                                : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                             }`}
                           >
                             {p}
@@ -1205,7 +1205,7 @@ export default function Home() {
                 <button
                   onClick={handleGenerateVideo}
                   disabled={!prompt.trim() || videoLoading}
-                  className="flex-1 h-12 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] font-semibold rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                  className="flex-1 h-12 btn-gradient text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-base"
                 >
                   {videoLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -1224,7 +1224,7 @@ export default function Home() {
                   <button
                     onClick={handleGenerate}
                     disabled={!prompt.trim() || loading}
-                    className="flex-1 h-12 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] font-semibold rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                    className="flex-1 h-12 btn-gradient text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-base"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -1244,7 +1244,7 @@ export default function Home() {
 
             {/* Error */}
             {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-[12px] text-red-400 text-sm flex items-start gap-3">
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-3 backdrop-blur-sm">
                 <span className="text-lg">⚠️</span>
                 <div className="flex-1">
                   <p>{error}</p>
@@ -1259,11 +1259,11 @@ export default function Home() {
           {/* Right Panel (60%) — Image Display */}
           <div className="lg:col-span-3 flex flex-col items-start">
             {videoLoading ? (
-              <div className="w-full aspect-video max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)]">
+              <div className="w-full aspect-video max-w-xl bg-[var(--surface-glass)] rounded-2xl flex flex-col items-center justify-center gap-4 border border-[var(--border)] backdrop-blur-sm">
                 <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
                 <p className="text-[var(--foreground)] text-sm font-medium">Generating video... {videoProgress}%</p>
-                <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                  <div className="h-full bg-[var(--primary)] rounded-full transition-all duration-500" style={{ width: `${videoProgress}%` }} />
+                <div className="w-48 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500" style={{ width: `${videoProgress}%` }} />
                 </div>
                 <p className="text-[var(--muted)] text-xs">
                   Elapsed: {videoElapsed}s
@@ -1280,7 +1280,7 @@ export default function Home() {
               </div>
             ) : videoResult ? (
               <div className="w-full max-w-xl space-y-4">
-                <div className="relative rounded-[12px] overflow-hidden border border-[var(--border)]">
+                <div className="relative rounded-2xl overflow-hidden border border-[var(--border)] shadow-2xl shadow-black/20">
                   <video
                     src={getVideoUrl(videoResult.id)}
                     controls
@@ -1293,21 +1293,21 @@ export default function Home() {
                   <a
                     href={getVideoUrl(videoResult.id)}
                     download={`video-${videoResult.id}.mp4`}
-                    className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
+                    className="px-4 py-2 btn-gradient text-white rounded-xl text-sm"
                   >
                     Download MP4
                   </a>
-                  <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
+                  <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2 rounded-lg hover:bg-[var(--surface-glass)]">
                     Start fresh
                   </button>
                 </div>
               </div>
             ) : animating ? (
-              <div className="w-full aspect-video max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)]">
+              <div className="w-full aspect-video max-w-xl bg-[var(--surface-glass)] rounded-2xl flex flex-col items-center justify-center gap-4 border border-[var(--border)] backdrop-blur-sm">
                 <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
                 <p className="text-[var(--foreground)] text-sm font-medium">Animating image... {animateProgress}%</p>
-                <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-500 rounded-full transition-all duration-500" style={{ width: `${animateProgress}%` }} />
+                <div className="w-48 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500" style={{ width: `${animateProgress}%` }} />
                 </div>
                 <p className="text-[var(--muted)] text-xs">
                   Elapsed: {animateElapsed}s
@@ -1324,7 +1324,7 @@ export default function Home() {
               </div>
             ) : animateResult ? (
               <div className="w-full max-w-xl space-y-4">
-                <div className="relative rounded-[12px] overflow-hidden border border-[var(--border)]">
+                <div className="relative rounded-2xl overflow-hidden border border-[var(--border)] shadow-2xl shadow-black/20">
                   <video
                     src={getVideoUrl(animateResult.id)}
                     controls
@@ -1337,17 +1337,17 @@ export default function Home() {
                   <a
                     href={getVideoUrl(animateResult.id)}
                     download={`animated-${animateResult.id}.mp4`}
-                    className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--foreground)] rounded-[8px] text-sm transition-colors"
+                    className="px-4 py-2 btn-gradient text-white rounded-xl text-sm"
                   >
                     Download MP4
                   </a>
-                  <button onClick={() => { setAnimateResult(null); setAnimateOpen(false); }} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2">
+                  <button onClick={() => { setAnimateResult(null); setAnimateOpen(false); }} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors px-4 py-2 rounded-lg hover:bg-[var(--surface-glass)]">
                     Back to image
                   </button>
                 </div>
               </div>
             ) : loading ? (
-              <div className="w-full aspect-square max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-4 border border-[var(--border)] relative overflow-hidden">
+              <div className="w-full aspect-square max-w-xl bg-[var(--surface-glass)] rounded-2xl flex flex-col items-center justify-center gap-4 border border-[var(--border)] relative overflow-hidden backdrop-blur-sm">
                 <div className="w-16 h-16 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
                 <p className="text-[var(--muted)] text-sm animate-pulse">
                   Creating your image...
@@ -1359,7 +1359,7 @@ export default function Home() {
                 {/* Current image with zoom/pan viewer */}
                 <div
                   ref={viewerRef}
-                  className={`relative group rounded-[12px] overflow-hidden border border-[var(--border)] ${zoom > 1 && !inpaintMode ? "cursor-grab active:cursor-grabbing" : ""}`}
+                  className={`relative group rounded-2xl overflow-hidden border border-[var(--border)] shadow-2xl shadow-black/20 ${zoom > 1 && !inpaintMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                   onWheel={handleWheel}
                   onMouseDown={handleViewerMouseDown}
                   onMouseMove={handleViewerMouseMove}
@@ -1407,23 +1407,23 @@ export default function Home() {
                       {zoom > 1 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); resetZoom(); }}
-                          className="px-2 py-1 bg-black/60 backdrop-blur-sm text-[var(--foreground)] text-xs rounded-[6px] hover:bg-black/80 transition-colors"
+                          className="px-2 py-1 bg-black/50 backdrop-blur-md text-white text-xs rounded-lg hover:bg-black/70 transition-colors"
                         >
                           Reset
                         </button>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.max(z - 0.5, 1)); }}
-                        className="w-7 h-7 bg-black/60 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[6px] hover:bg-black/80 transition-colors flex items-center justify-center"
+                        className="w-7 h-7 bg-black/50 backdrop-blur-md text-white text-sm rounded-lg hover:bg-black/70 transition-colors flex items-center justify-center"
                       >
                         −
                       </button>
-                      <span className="px-2 py-1 bg-black/60 backdrop-blur-sm text-[var(--foreground)] text-xs rounded-[6px] min-w-[40px] text-center">
+                      <span className="px-2 py-1 bg-black/50 backdrop-blur-md text-white text-xs rounded-lg min-w-[40px] text-center">
                         {Math.round(zoom * 100)}%
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); setZoom((z) => Math.min(z + 0.5, 8)); }}
-                        className="w-7 h-7 bg-black/60 backdrop-blur-sm text-[var(--foreground)] text-sm rounded-[6px] hover:bg-black/80 transition-colors flex items-center justify-center"
+                        className="w-7 h-7 bg-black/50 backdrop-blur-md text-white text-sm rounded-lg hover:bg-black/70 transition-colors flex items-center justify-center"
                       >
                         +
                       </button>
@@ -1432,7 +1432,7 @@ export default function Home() {
 
                   {/* Resolution badge */}
                   {result.upscaled && (
-                    <div className="absolute top-3 left-3 bg-green-500/80 backdrop-blur-sm text-[var(--foreground)] text-xs px-2 py-1 rounded-[6px]">
+                    <div className="absolute top-3 left-3 bg-green-500/80 backdrop-blur-md text-white text-xs px-2 py-1 rounded-lg">
                       {result.size} ({result.upscale_factor}x)
                     </div>
                   )}
@@ -1443,63 +1443,63 @@ export default function Home() {
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setInpaintMode(true)}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all"
                     >
                       🖌️ Edit Region
                     </button>
                     <button
                       onClick={handleRemoveBackground}
                       disabled={removingBg}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-50"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all disabled:opacity-50"
                     >
                       {removingBg ? "Removing..." : "🔲 Remove BG"}
                     </button>
                     <button
                       onClick={() => handleUpscale(2)}
                       disabled={upscaling}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-50"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all disabled:opacity-50"
                     >
                       {upscaling ? "Upscaling..." : "⬆ Upscale 2x"}
                     </button>
                     <button
                       onClick={() => handleUpscale(4)}
                       disabled={upscaling}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-50"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all disabled:opacity-50"
                     >
                       ⬆ 4x
                     </button>
                     <button
                       onClick={() => setAdjustOpen(true)}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all"
                     >
                       🎨 Adjust
                     </button>
                     <button
                       onClick={() => { setWatermarkOpen(!watermarkOpen); }}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
+                      className={`px-4 py-2 bg-[var(--surface-glass)] border rounded-xl text-sm transition-all ${
                         watermarkOpen
-                          ? "border-amber-500 text-amber-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-amber-500"
+                          ? "border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-amber-500/40"
                       }`}
                     >
                       💧 Watermark
                     </button>
                     <button
                       onClick={() => setAnimateOpen(!animateOpen)}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
+                      className={`px-4 py-2 bg-[var(--surface-glass)] border rounded-xl text-sm transition-all ${
                         animateOpen
-                          ? "border-purple-500 text-purple-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-purple-500"
+                          ? "border-purple-500/50 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-purple-500/40"
                       }`}
                     >
                       🎬 Animate
                     </button>
                     <button
                       onClick={() => { setReplaceOpen(!replaceOpen); }}
-                      className={`px-4 py-2 bg-[var(--surface)] border rounded-[8px] text-sm transition-all ${
+                      className={`px-4 py-2 bg-[var(--surface-glass)] border rounded-xl text-sm transition-all ${
                         replaceOpen
-                          ? "border-orange-500 text-orange-400"
-                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-orange-500"
+                          ? "border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.15)]"
+                          : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-orange-500/40"
                       }`}
                     >
                       🔄 Replace
@@ -1507,7 +1507,7 @@ export default function Home() {
                     <button
                       onClick={handleUndo}
                       disabled={!canUndo}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Undo (⌘Z)"
                     >
                       ↩ Undo
@@ -1515,7 +1515,7 @@ export default function Home() {
                     <button
                       onClick={handleRedo}
                       disabled={!canRedo}
-                      className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Redo (⌘⇧Z)"
                     >
                       ↪ Redo
@@ -1523,17 +1523,17 @@ export default function Home() {
                     <div className="relative">
                       <button
                         onClick={() => setShareOpen(!shareOpen)}
-                        className="px-4 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-[8px] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all"
+                        className="px-4 py-2 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)]/40 hover:shadow-[0_0_15px_var(--glow)] transition-all"
                         title="Download works in browser, not in preview"
                       >
                         ⬇ Download (open in browser)
                       </button>
                       {shareOpen && (
-                        <div className="absolute top-full mt-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-[12px] p-3 shadow-xl z-20 min-w-[180px] space-y-2">
-                          <a href={getDownloadUrl(result.id, "png")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                        <div className="absolute top-full mt-2 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 shadow-2xl shadow-black/30 z-20 min-w-[180px] space-y-1 backdrop-blur-xl">
+                          <a href={getDownloadUrl(result.id, "png")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-glass)] rounded-lg transition-colors">
                             📄 Download PNG
                           </a>
-                          <a href={getDownloadUrl(result.id, "jpeg")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded-[6px] transition-colors">
+                          <a href={getDownloadUrl(result.id, "jpeg")} className="block px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-glass)] rounded-lg transition-colors">
                             📸 Download JPEG
                           </a>
                         </div>
@@ -1544,10 +1544,10 @@ export default function Home() {
 
                 {/* Animate controls */}
                 {animateOpen && !inpaintMode && !adjustOpen && (
-                  <div className="space-y-3 bg-[var(--surface)] rounded-[12px] border border-purple-500/30 p-4">
+                  <div className="space-y-3 bg-[var(--surface-glass)] rounded-xl border border-purple-500/20 p-4 backdrop-blur-sm shadow-[0_0_30px_rgba(168,85,247,0.08)]">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--foreground)]">Animate this image</span>
-                      <button onClick={() => setAnimateOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                      <button onClick={() => setAnimateOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -1555,7 +1555,7 @@ export default function Home() {
                       value={animatePrompt}
                       onChange={(e) => setAnimatePrompt(e.target.value)}
                       placeholder="Describe the motion... (e.g., zoom in slowly, camera pan left)"
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-[8px] h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-purple-500 transition-colors"
+                      className="w-full bg-[var(--background)]/50 border border-[var(--border)] rounded-lg h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-purple-500/50 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] transition-all"
                       onKeyDown={(e) => { if (e.key === "Enter") handleAnimate(); }}
                     />
                     <div className="flex gap-2 items-center">
@@ -1563,7 +1563,7 @@ export default function Home() {
                       <button
                         onClick={() => setAnimateQuality("standard")}
                         className={`px-3 py-1 rounded-full text-xs transition-all ${
-                          animateQuality === "standard" ? "bg-purple-500 text-[var(--foreground)]" : "bg-[var(--border)] text-[var(--muted)]"
+                          animateQuality === "standard" ? "bg-purple-500 text-white shadow-sm" : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)]"
                         }`}
                       >
                         Standard
@@ -1571,7 +1571,7 @@ export default function Home() {
                       <button
                         onClick={() => setAnimateQuality("pro")}
                         className={`px-3 py-1 rounded-full text-xs transition-all ${
-                          animateQuality === "pro" ? "bg-purple-500 text-[var(--foreground)]" : "bg-[var(--border)] text-[var(--muted)]"
+                          animateQuality === "pro" ? "bg-purple-500 text-white shadow-sm" : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)]"
                         }`}
                       >
                         Pro
@@ -1579,7 +1579,7 @@ export default function Home() {
                       <button
                         onClick={handleAnimate}
                         disabled={!animatePrompt.trim()}
-                        className="ml-auto bg-purple-500 hover:bg-purple-600 rounded-[8px] h-8 px-4 text-sm text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="ml-auto bg-purple-500 hover:bg-purple-600 rounded-lg h-8 px-4 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_rgba(168,85,247,0.3)]"
                       >
                         Animate
                       </button>
@@ -1589,10 +1589,10 @@ export default function Home() {
 
                 {/* Watermark controls */}
                 {watermarkOpen && !inpaintMode && !adjustOpen && (
-                  <div className="space-y-3 bg-[var(--surface)] rounded-[12px] border border-amber-500/30 p-4">
+                  <div className="space-y-3 bg-[var(--surface-glass)] rounded-xl border border-amber-500/20 p-4 backdrop-blur-sm shadow-[0_0_30px_rgba(245,158,11,0.08)]">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--foreground)]">Add Watermark</span>
-                      <button onClick={() => { setWatermarkOpen(false); setWatermarkText(""); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                      <button onClick={() => { setWatermarkOpen(false); setWatermarkText(""); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -1600,7 +1600,7 @@ export default function Home() {
                       value={watermarkText}
                       onChange={(e) => setWatermarkText(e.target.value)}
                       placeholder="Watermark text..."
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-[8px] h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-amber-500 transition-colors"
+                      className="w-full bg-[var(--background)]/50 border border-[var(--border)] rounded-lg h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-amber-500/50 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)] transition-all"
                     />
                     <div>
                       <span className="text-xs text-[var(--muted)] mb-2 block">Position</span>
@@ -1618,8 +1618,8 @@ export default function Home() {
                             onClick={() => setWatermarkPosition(p.id)}
                             className={`px-3 py-1 rounded-full text-xs transition-all ${
                               watermarkPosition === p.id
-                                ? "bg-amber-500 text-[var(--foreground)]"
-                                : "bg-[var(--border)] text-[var(--muted)] hover:bg-amber-500/30"
+                                ? "bg-amber-500 text-white shadow-sm"
+                                : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-amber-500/30"
                             }`}
                           >
                             {p.label}
@@ -1666,7 +1666,7 @@ export default function Home() {
                     <button
                       onClick={handleWatermark}
                       disabled={!watermarkText.trim() || watermarking}
-                      className="w-full bg-amber-500 hover:bg-amber-600 rounded-[8px] h-9 text-sm text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="w-full bg-amber-500 hover:bg-amber-600 rounded-lg h-9 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]"
                     >
                       {watermarking ? "Applying..." : "Apply Watermark"}
                     </button>
@@ -1675,24 +1675,24 @@ export default function Home() {
 
                 {/* Object replacement panel */}
                 {replaceOpen && !inpaintMode && (
-                  <div className="bg-[var(--surface)] rounded-[12px] border border-orange-500/30 p-4 space-y-3">
+                  <div className="bg-[var(--surface-glass)] rounded-xl border border-orange-500/20 p-4 space-y-3 backdrop-blur-sm shadow-[0_0_30px_rgba(249,115,22,0.08)]">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--foreground)]">Replace Object</span>
-                      <button onClick={() => setReplaceOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">Close</button>
+                      <button onClick={() => setReplaceOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">Close</button>
                     </div>
                     <input
                       type="text"
                       placeholder="Object to replace (e.g., 'the cat')"
                       value={replaceTarget}
                       onChange={(e) => setReplaceTarget(e.target.value)}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-[6px] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-orange-500"
+                      className="w-full bg-[var(--background)]/50 border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_15px_rgba(249,115,22,0.15)] transition-all"
                     />
                     <input
                       type="text"
                       placeholder="Replace with (e.g., 'a golden retriever')"
                       value={replaceWith}
                       onChange={(e) => setReplaceWith(e.target.value)}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-[6px] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-orange-500"
+                      className="w-full bg-[var(--background)]/50 border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-orange-500/50 focus:shadow-[0_0_15px_rgba(249,115,22,0.15)] transition-all"
                     />
                     <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
                       <input
@@ -1706,7 +1706,7 @@ export default function Home() {
                     <button
                       onClick={handleReplaceObject}
                       disabled={!replaceTarget.trim() || !replaceWith.trim() || replaceLoading}
-                      className="w-full bg-orange-500 hover:bg-orange-600 rounded-[8px] h-9 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="w-full bg-orange-500 hover:bg-orange-600 rounded-lg h-9 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_rgba(249,115,22,0.3)]"
                     >
                       {replaceLoading ? "Replacing..." : "Replace Object"}
                     </button>
@@ -1715,10 +1715,10 @@ export default function Home() {
 
                 {/* Adjustment sliders */}
                 {adjustOpen && (
-                  <div className="space-y-3 bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-4">
+                  <div className="space-y-3 bg-[var(--surface-glass)] rounded-xl border border-[var(--border)] p-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--foreground)]">Adjust Image</span>
-                      <button onClick={() => { setAdjustOpen(false); setAdjustParams({ brightness: 1.0, contrast: 1.0, saturation: 1.0, sharpness: 1.0, blur: 0 }); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                      <button onClick={() => { setAdjustOpen(false); setAdjustParams({ brightness: 1.0, contrast: 1.0, saturation: 1.0, sharpness: 1.0, blur: 0 }); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -1748,14 +1748,14 @@ export default function Home() {
                     <div className="flex gap-2 justify-end">
                       <button
                         onClick={() => setAdjustParams({ brightness: 1.0, contrast: 1.0, saturation: 1.0, sharpness: 1.0, blur: 0 })}
-                        className="px-3 py-1 text-xs text-[var(--muted)] hover:text-[var(--foreground)] bg-[var(--border)] rounded-[6px]"
+                        className="px-3 py-1 text-xs text-[var(--muted)] hover:text-[var(--foreground)] bg-[var(--surface-glass)] border border-[var(--border)] rounded-lg transition-colors"
                       >
                         Reset
                       </button>
                       <button
                         onClick={handleApplyAdjustments}
                         disabled={adjusting}
-                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-[8px] h-8 px-4 text-sm text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-lg h-8 px-4 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_var(--glow)]"
                       >
                         {adjusting ? "Applying..." : "Apply"}
                       </button>
@@ -1765,10 +1765,10 @@ export default function Home() {
 
                 {/* Inpaint controls */}
                 {inpaintMode && (
-                  <div className="space-y-3 bg-[var(--surface)] rounded-[12px] border border-[var(--border)] p-4">
+                  <div className="space-y-3 bg-[var(--surface-glass)] rounded-xl border border-[var(--border)] p-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--foreground)]">Draw mask on the area to edit</span>
-                      <button onClick={() => { setInpaintMode(false); clearMask(); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                      <button onClick={() => { setInpaintMode(false); clearMask(); }} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -1781,17 +1781,17 @@ export default function Home() {
                           onClick={() => setBrushSize(b.size)}
                           className={`w-8 h-8 rounded-full text-xs flex items-center justify-center transition-all ${
                             brushSize === b.size
-                              ? "bg-[var(--primary)] text-[var(--foreground)]"
-                              : "bg-[var(--border)] text-[var(--muted)] hover:bg-[var(--primary)] hover:text-[var(--foreground)]"
+                              ? "bg-[var(--primary)] text-white shadow-sm shadow-[var(--glow)]"
+                              : "bg-[var(--surface-glass)] border border-[var(--border)] text-[var(--muted)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
                           }`}
                         >
                           {b.label}
                         </button>
                       ))}
-                      <button onClick={undoMask} className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1 bg-[var(--border)] rounded-[6px]">
+                      <button onClick={undoMask} className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1 bg-[var(--surface-glass)] border border-[var(--border)] rounded-lg transition-colors">
                         Undo
                       </button>
-                      <button onClick={clearMask} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1 bg-[var(--border)] rounded-[6px]">
+                      <button onClick={clearMask} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1 bg-[var(--surface-glass)] border border-[var(--border)] rounded-lg transition-colors">
                         Clear
                       </button>
                     </div>
@@ -1801,14 +1801,14 @@ export default function Home() {
                         value={inpaintPrompt}
                         onChange={(e) => setInpaintPrompt(e.target.value)}
                         placeholder="What should go in the masked area?"
-                        className="flex-1 bg-[var(--background)] border border-[var(--border)] rounded-[8px] h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors"
+                        className="flex-1 bg-[var(--background)]/50 border border-[var(--border)] rounded-lg h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]/50 focus:shadow-[0_0_15px_var(--glow)] transition-all"
                         onKeyDown={(e) => { if (e.key === "Enter") handleInpaint(); }}
                         disabled={inpainting}
                       />
                       <button
                         onClick={handleInpaint}
                         disabled={!inpaintPrompt.trim() || inpainting}
-                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-[8px] h-10 px-4 text-sm text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-lg h-10 px-4 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_var(--glow)]"
                       >
                         {inpainting ? "Applying..." : "Apply"}
                       </button>
@@ -1818,7 +1818,7 @@ export default function Home() {
 
                 {/* Enhanced prompt display */}
                 {result.enhanced_prompt && (
-                  <div className="p-4 bg-[var(--surface)] rounded-[12px] border border-[var(--border)]">
+                  <div className="p-4 bg-[var(--surface-glass)] rounded-xl border border-[var(--border)] backdrop-blur-sm">
                     <p className="text-xs text-[var(--muted)] mb-1">Enhanced prompt:</p>
                     <p className="text-sm text-[var(--foreground)] opacity-80">{result.enhanced_prompt}</p>
                   </div>
@@ -1832,7 +1832,7 @@ export default function Home() {
                         value={refinementInput}
                         onChange={(e) => setRefinementInput(e.target.value)}
                         placeholder="Refine this image... (e.g., make it more vibrant)"
-                        className="flex-1 bg-[var(--background)] border border-[var(--border)] rounded-[8px] h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors"
+                        className="flex-1 bg-[var(--surface-glass)] border border-[var(--border)] rounded-xl h-10 px-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]/50 focus:shadow-[0_0_15px_var(--glow)] transition-all"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleRefine();
                         }}
@@ -1841,7 +1841,7 @@ export default function Home() {
                       <button
                         onClick={handleRefine}
                         disabled={!refinementInput.trim() || refining}
-                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-[8px] h-10 w-10 flex items-center justify-center text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl h-10 w-10 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_20px_var(--glow)]"
                       >
                         {refining ? (
                           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -1853,7 +1853,7 @@ export default function Home() {
                         )}
                       </button>
                     </div>
-                    <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+                    <button onClick={handleStartFresh} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors hover:bg-[var(--surface-glass)] px-3 py-1.5 rounded-lg">
                       ← Start fresh
                     </button>
                   </>
@@ -1861,9 +1861,10 @@ export default function Home() {
               </div>
             ) : (
               /* ===== Empty State ===== */
-              <div className="w-full aspect-square max-w-xl bg-[var(--surface)] rounded-[12px] flex flex-col items-center justify-center gap-3 border border-[var(--border)] border-dashed">
-                <div className="text-5xl opacity-30">🖼️</div>
+              <div className="w-full aspect-square max-w-xl bg-[var(--surface-glass)] rounded-2xl flex flex-col items-center justify-center gap-4 border border-[var(--border)] border-dashed backdrop-blur-sm">
+                <div className="w-16 h-16 rounded-2xl bg-[var(--surface-glass)] border border-[var(--border)] flex items-center justify-center text-3xl opacity-30">🖼️</div>
                 <p className="text-[var(--muted)] text-sm">Your generated image will appear here</p>
+                <p className="text-[var(--muted)]/50 text-xs">Describe what you want and hit Generate</p>
               </div>
             )}
           </div>

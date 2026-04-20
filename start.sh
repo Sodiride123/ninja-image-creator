@@ -14,6 +14,6 @@ echo "      Backend started (PID: $BACKEND_PID)"
 # Start frontend in background
 echo "[2/2] Starting frontend (Next.js on port 3000)..."
 cd /workspace/ninja-image-creator/frontend
-npm run dev &
+npm run build && npm run start &
 FRONTEND_PID=$!
 echo "      Frontend started (PID: $FRONTEND_PID)"
